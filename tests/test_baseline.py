@@ -9,7 +9,8 @@ import unittest
 from coder.__main__ import read_notes
 from coder.bm25 import BM25
 from coder.clinical_query import diagnosis_focus
-from coder.retriever import CandidateRetriever
+from coder.retriever import CandidateRetriever, reciprocal_rank_fusion
+from coder.semantic import catalogue_digest
 
 
 class RetrievalTests(unittest.TestCase):
@@ -48,6 +49,14 @@ class RetrievalTests(unittest.TestCase):
         original = "Cough and fever without an explicit assessment"
         self.assertEqual(diagnosis_focus(original), original)
 
+    def test_diagnosis_focus_ignores_patient_suspicion_and_ruled_out_cues(self):
+        note = (
+            "Patient: I think it's my thyroid.\n"
+            "Doctor: Tests are normal, so it's not the thyroid.\n"
+            "Doctor: BMI is in the obesity range."
+        )
+        self.assertEqual(diagnosis_focus(note), note)
+
     def test_family_pool_uses_only_real_catalogue_codes(self):
         index = BM25([
             {"code": "CA23", "title": "Asthma"},
@@ -63,6 +72,21 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(len(pool), len(set(pool)))
         self.assertLessEqual(set(pool), set(index.codes))
         self.assertNotIn("CA23.3212", pool)
+
+    def test_rank_fusion_is_deterministic_and_validates_weights(self):
+        self.assertEqual(
+            reciprocal_rank_fusion(
+                [["A", "B", "C"], ["B", "C", "D"]], limit=4, constant=0
+            ),
+            ["B", "A", "C", "D"],
+        )
+        with self.assertRaisesRegex(ValueError, "one fusion weight"):
+            reciprocal_rank_fusion([["A"]], [1.0, 2.0])
+
+    def test_catalogue_digest_tracks_code_title_order(self):
+        rows = [{"code": "A", "title": "One"}, {"code": "B", "title": "Two"}]
+        self.assertEqual(catalogue_digest(rows), catalogue_digest(list(rows)))
+        self.assertNotEqual(catalogue_digest(rows), catalogue_digest(list(reversed(rows))))
 
 
 class RunnerTests(unittest.TestCase):

@@ -11,6 +11,54 @@ def code_family(code: str) -> str:
     return code.split(".", 1)[0]
 
 
+def reciprocal_rank_fusion(
+    rankings: list[list[str]],
+    weights: list[float] | None = None,
+    limit: int = 50,
+    constant: int = 60,
+) -> list[str]:
+    """Fuse rank positions without assuming comparable score scales."""
+    if limit <= 0:
+        return []
+    if weights is None:
+        weights = [1.0] * len(rankings)
+    if len(rankings) != len(weights):
+        raise ValueError("each ranking needs one fusion weight")
+    scores = defaultdict(float)
+    for ranking, weight in zip(rankings, weights):
+        for position, code in enumerate(ranking):
+            scores[code] += weight / (constant + position + 1)
+    return sorted(scores, key=lambda code: (-scores[code], code))[:limit]
+
+
+class HybridRetriever:
+    """Fuse focused lexical and biomedical entity-linking retrieval."""
+
+    def __init__(self, lexical: "CandidateRetriever", semantic):
+        self.lexical = lexical
+        self.semantic = semantic
+
+    def ranking(
+        self,
+        text: str,
+        limit: int = 50,
+        lexical_weight: float = 1.0,
+        semantic_weight: float = 1.0,
+    ) -> list[str]:
+        search_limit = min(len(self.lexical.index.codes), max(limit * 10, 500))
+        lexical = [
+            code for code, _ in self.lexical.focused_ranking(text, search_limit)
+        ]
+        semantic = [
+            code for code, _ in self.semantic.search(diagnosis_focus(text), search_limit)
+        ]
+        return reciprocal_rank_fusion(
+            [lexical, semantic],
+            [lexical_weight, semantic_weight],
+            limit,
+        )
+
+
 class CandidateRetriever:
     """Build a diverse candidate pool without inventing hierarchy or codes."""
 
