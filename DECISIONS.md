@@ -37,3 +37,15 @@ Decision: track the supplied scorer byte-for-byte, outside the runtime image. Ev
 Commit: `Record baseline validation and clean-clone results`.
 
 Decision: accept source commit f3de75a as the first working control. Evidence: cloned with `git clone --no-local` into /tmp/su-baseline-check; a no-cache Docker build and the exact `docker compose run coder /in/notes.jsonl /out/predictions.jsonl` command passed with network disabled, 1 CPU/1 GB, and no model keys required. The clean-clone scorer reproduced 7.9/75 with no missing/invalid/duplicate predictions, candidate recall reproduced 26/60 at 25 and 31/60 at 50, and all five tests passed from the clone. Native and Docker predictions were byte-identical. The 600-note repeated-dev workload had 600 unique expected IDs and valid distinct codes; it establishes throughput, not clinical generalisation. Original scorer, catalogue, and gold files were byte-compared against the uploads. Alternative: proceed using only current-directory checks, rejected because the brief explicitly requires fresh-clone reproducibility. Revisit these checks when dependencies or the pipeline change.
+
+## 2026-11-05 14:05 UTC — Focus lexical search on documented assessment
+
+Commit: `Add diagnosis-focused family retrieval`.
+
+Decision: detect generic assessment/diagnosis cues and search their trailing text; fall back to the full note when no cue or lexical overlap exists. Alternatives: keep full-note BM25, add disease-specific aliases, or call an LLM immediately. Evidence: the frozen control often ranked symptoms, precautions, and background conditions. The focused strategy improved top-1 from 5/60 to 14/60 and top-3 from 9/60 to 23/60, raising the official dev score from 7.9 to 21.2/75. It added 14 top-3 hits without losing any, while top-1 gained 10 and lost one. Rules contain no disease names, code prefixes, note IDs, or gold labels. Revisit cue precision on independent note styles.
+
+## 2026-11-05 14:05 UTC — Create a bounded catalogue-family candidate pool
+
+Commit: `Add diagnosis-focused family retrieval`.
+
+Decision: preserve the top 25 focused results, add up to 10 new full-note results, then round-robin actual members of at most five dot-prefix families until 50 candidates. Alternatives: infer a WHO graph, expand all prefix matches, or use focused results alone. Evidence: every dotted code in the supplied catalogue has its root present, while official parent edges are absent. The bounded pool raises exact gold recall@50 from the control's 31/60 to 40/60 and recall@25 to 38/60. Family expansion never fabricates codes and begins after the top 25, so clinical ranking remains a separate future step. These pool sizes were selected after a small dev comparison and therefore require validation beyond dev. Revisit once a semantic retriever and constrained reranker exist.

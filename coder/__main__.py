@@ -7,6 +7,7 @@ import sys
 import time
 
 from .bm25 import BM25
+from .retriever import CandidateRetriever
 
 
 DEFAULT_MMS = Path(__file__).resolve().parent.parent / "data" / "mms-2026-01.json"
@@ -32,26 +33,35 @@ def read_notes(handle):
         yield {"id": note["id"], "text": note["text"]}
 
 
-def run(input_path: Path, output_path: Path, mms_path: Path) -> dict:
+def run(input_path: Path, output_path: Path, mms_path: Path, strategy: str = "focused") -> dict:
     if output_path.resolve() in {input_path.resolve(), mms_path.resolve()}:
         raise ValueError("output must not overwrite the input or catalogue")
     started = time.perf_counter()
     index = BM25.from_file(mms_path)
+    retriever = CandidateRetriever(index)
     valid = set(index.codes)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     count = zero_overlap = 0
     with input_path.open(encoding="utf-8") as source:
         with output_path.open("w", encoding="utf-8") as destination:
             for note in read_notes(source):
-                ranked = index.search(note["text"], limit=3)
-                codes = [code for code, _ in ranked]
+                if strategy == "baseline":
+                    ranked = index.search(note["text"], limit=3)
+                    codes = [code for code, _ in ranked]
+                    zero_overlap += ranked[0][1] == 0.0
+                elif strategy == "focused":
+                    ranked = retriever.focused_ranking(note["text"], limit=3)
+                    codes = [code for code, _ in ranked]
+                    zero_overlap += ranked[0][1] == 0.0
+                else:
+                    raise ValueError(f"unknown strategy {strategy!r}")
                 if not codes or len(codes) != len(set(codes)) or not set(codes) <= valid:
                     raise ValueError(f"invalid internal prediction for {note['id']!r}")
                 destination.write(json.dumps({"id": note["id"], "codes": codes}, ensure_ascii=False) + "\n")
                 destination.flush()
                 count += 1
-                zero_overlap += ranked[0][1] == 0.0
     return {
+        "strategy": strategy,
         "notes": count,
         "catalogue_codes": len(valid),
         "zero_overlap_notes": zero_overlap,
@@ -60,13 +70,14 @@ def run(input_path: Path, output_path: Path, mms_path: Path) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Title-only BM25 ICD-11 baseline")
+    parser = argparse.ArgumentParser(description="Lexical ICD-11 candidate retrieval")
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--mms", type=Path, default=DEFAULT_MMS)
+    parser.add_argument("--strategy", choices=("focused", "baseline"), default="focused")
     args = parser.parse_args()
     try:
-        summary = run(args.input, args.output, args.mms)
+        summary = run(args.input, args.output, args.mms, args.strategy)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"coder: {error}", file=sys.stderr)
         return 2

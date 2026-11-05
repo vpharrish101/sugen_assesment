@@ -8,6 +8,8 @@ import unittest
 
 from coder.__main__ import read_notes
 from coder.bm25 import BM25
+from coder.clinical_query import diagnosis_focus
+from coder.retriever import CandidateRetriever
 
 
 class RetrievalTests(unittest.TestCase):
@@ -36,6 +38,31 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(list(read_notes([json.dumps(note)])), [{"id": "x", "text": "asthma"}])
         with self.assertRaisesRegex(ValueError, "duplicate id"):
             list(read_notes([json.dumps(note)] * 2))
+
+    def test_diagnosis_focus_uses_generic_cues_and_falls_back(self):
+        self.assertEqual(
+            diagnosis_focus("S: coughing. A: Asthma with exacerbation. P: inhaler."),
+            "Asthma with exacerbation.",
+        )
+        self.assertEqual(diagnosis_focus("Dx viral upper respiratory infection."), "viral upper respiratory infection.")
+        original = "Cough and fever without an explicit assessment"
+        self.assertEqual(diagnosis_focus(original), original)
+
+    def test_family_pool_uses_only_real_catalogue_codes(self):
+        index = BM25([
+            {"code": "CA23", "title": "Asthma"},
+            {"code": "CA23.30", "title": "Asthma with exacerbation"},
+            {"code": "CA23.32", "title": "Asthma uncomplicated"},
+            {"code": "CA24", "title": "Bronchiectasis"},
+            {"code": "ZZ00", "title": "Unrelated condition"},
+        ])
+        pool = CandidateRetriever(index).candidate_pool(
+            "Assessment: asthma attack", limit=5, focused_seeds=1,
+            full_note_seeds=1, expanded_families=1,
+        )
+        self.assertEqual(len(pool), len(set(pool)))
+        self.assertLessEqual(set(pool), set(index.codes))
+        self.assertNotIn("CA23.3212", pool)
 
 
 class RunnerTests(unittest.TestCase):
