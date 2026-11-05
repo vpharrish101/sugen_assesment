@@ -31,3 +31,9 @@ Decision: record the raw-title baseline without tuning against dev gold. Alterna
 Commit: `Include official scorer for reproducible evaluation`.
 
 Decision: track the supplied scorer byte-for-byte, outside the runtime image. Evidence: the first explicit staging list omitted score.py even though local evaluation used it; clean-clone review caught the omission. Alternative: document downloading the scorer separately, which would weaken reproduction. Revisit only if the assessment provides a new scorer.
+
+## 2026-11-05 13:29 UTC — Clean-clone reproduction passed
+
+Commit: `Record baseline validation and clean-clone results`.
+
+Decision: accept source commit f3de75a as the first working control. Evidence: cloned with `git clone --no-local` into /tmp/su-baseline-check; a no-cache Docker build and the exact `docker compose run coder /in/notes.jsonl /out/predictions.jsonl` command passed with network disabled, 1 CPU/1 GB, and no model keys required. The clean-clone scorer reproduced 7.9/75 with no missing/invalid/duplicate predictions, candidate recall reproduced 26/60 at 25 and 31/60 at 50, and all five tests passed from the clone. Native and Docker predictions were byte-identical. The 600-note repeated-dev workload had 600 unique expected IDs and valid distinct codes; it establishes throughput, not clinical generalisation. Original scorer, catalogue, and gold files were byte-compared against the uploads. Alternative: proceed using only current-directory checks, rejected because the brief explicitly requires fresh-clone reproducibility. Revisit these checks when dependencies or the pipeline change.

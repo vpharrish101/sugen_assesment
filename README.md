@@ -24,8 +24,8 @@ python -m unittest discover -s tests -v
 
 **Data/provenance:** original assessment files are preserved, including unmodified `score.py`; `data/notes.jsonl` is derived from the supplied dev input. No external medical data added. Dev gold/scorer are excluded from the image; only catalogue and runner are copied. The Python base image is digest-pinned.
 
-**Beyond dev:** five unit/CLI tests cover unseen/Unicode IDs, empty and unmatched notes, ignored gold fields, duplicate rejection, and input preservation. With Docker networking disabled and a 1 CPU/1 GB limit, 600 repeated-dev notes with new IDs took **2.24 seconds** inside the runner. This checks throughput only, not generalisation. Metrics and source hashes are in `reports/baseline.json`; clean-clone verification is recorded in `DECISIONS.md` when completed.
+**Beyond dev:** five unit/CLI tests cover unseen/Unicode IDs, empty and unmatched notes, ignored gold fields, duplicate rejection, and input preservation. A fresh clone passed a no-cache image build, the exact Compose command, the official scorer, and all five tests. Native and Docker dev predictions were identical. With Docker networking disabled and a 1 CPU/1 GB limit, 600 repeated-dev notes with new IDs took **2.24 seconds** inside the runner, with all 600 IDs covered and all codes valid. This checks throughput only, not generalisation. Metrics and source hashes are in `reports/baseline.json`.
 
 **AI error caught:** preliminary AI research mapped chickenpox to `1F51.Z`; the supplied catalogue identifies that as African trypanosomiasis. Uncomplicated varicella is `1E90.0`. Outputs are therefore always checked against the catalogue; this still does not guarantee clinical correctness.
 
-Hours spent: final accounting pending; this is an intermediate baseline. See `DECISIONS.md` for implementation decisions and evidence.
+Hours spent: approximately 0.15 hours for this baseline implementation/verification; total assessment accounting remains pending. See `DECISIONS.md` for decisions and evidence.
