@@ -85,3 +85,27 @@ Decision: restore the exact Qwen3 4B Ollama prompt and settings used in the loca
 Commit: `Restore Qwen prototype and bound llama-server RAM`.
 
 Decision: launch llama.cpp build b12144 with `--cache-ram 0`, `--no-cache-idle-slots`, one slot, a 4,096-token context, and bounded batch sizes; disable per-request prompt caching in the llama-server client. Alternative: leave the server's 8,192 MiB default RAM prompt cache enabled or restart the process periodically. Evidence: `llama-server --help` documents that default; with caching disabled, ten distinct roughly 440-token prompts held resident memory at 4,715 MiB after each request on the cloud CPU host. This is a limited memory probe and does not prove laptop behavior over 60 notes. Revisit if the user's laptop still shows growth with the same flags.
+
+## 2026-11-06 16:30 UTC — Integrate fresh-note inference and a source layout
+
+Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
+
+Decision: place runtime code in `src/coder`, provider clients in `src/coder/providers`, configuration in `config`, and keep frozen experiments under `experiments/ollama`. Generate candidates from fresh notes, preserving the measured English mixture, candidate fusion and Qwen prompt. Alternatives: ship only frozen experiment files, replace English with hard routing (26/42), or adopt hierarchy/two-pass without a winning result. Evidence: English mixture is 27/44, Qwen 38/49; hierarchy 38/43 is worse. The new prompt regression is byte-identical. Revisit only with independent comparative evaluation.
+
+## 2026-11-06 16:30 UTC — Add a narrow multilingual extraction route
+
+Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
+
+Decision: retain pinned SapBERT encoders, add generic Spanish/Chinese section/speaker/assertion cues and note-local Schwartz–Hearst abbreviation expansion. Route non-English to multilingual SapBERT and exclude zero-score BM25 votes. Alternatives: translating every note with a second LLM, raising the embedding context alone, or disease-name aliases. Evidence from earlier local tests: context 384 alone did not improve the translated counts; structural extraction improved Spanish 0/0 to 2/3 and Chinese 0/0 to 0/2 on six paired cases each, with pool recall improving to 5/6 and 4/6. These visible cases informed development and are not independent validation. English extraction stayed unchanged across all 60 notes. Revisit on clinician-reviewed held-out multilingual notes.
+
+## 2026-11-06 16:30 UTC — API first, Qwen second, retrieval last
+
+Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
+
+Decision requested by user: use Anthropic Haiku 5.5 for expensive reranking, local Qwen when configured as fallback, and offline retrieval if neither succeeds. Alternatives: mandatory local GPU or pretending Qwen's score applies to another provider. Evidence: grader has no GPU, allows Anthropic/OpenAI APIs and demands no-key coverage. Verified `claude-haiku-5-5` in the official SDK. The actual SDK test caught removed `temperature` support; use its supported interface and forced ranking tool. No live key is available here, so no live API accuracy is claimed. Revisit after a real API smoke test and dev evaluation.
+
+## 2026-11-06 16:30 UTC — Bound API time/spend and preserve coverage
+
+Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
+
+Decision: no SDK retries, conservative $5.50 reservation with UTF-8 byte/token overestimate and full output cap, keep reservation even on errors, disable each provider after three consecutive failures, and leave 300 seconds for fallbacks. Alternatives: retry until success or stop on each malformed response. Evidence: brief caps all 600 notes at $6/60 minutes and missing notes score zero. SDK MockTransport tests verify 429 makes one request, over-budget calls make none, and API/local failures still emit every ID. Secondary pricing source is cited; official pricing page could not be reached through policy. Revisit against live latency, usage and current provider pricing before submitting.

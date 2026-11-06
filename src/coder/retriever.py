@@ -1,6 +1,6 @@
 """Diagnosis-focused retrieval with bounded, catalogue-backed family expansion."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from .bm25 import BM25
 from .clinical_query import diagnosis_focus
@@ -32,68 +32,63 @@ def reciprocal_rank_fusion(
 
 
 class HybridRetriever:
-    """Fuse English and multilingual biomedical entity-linking retrieval."""
+    """Keep the measured English mixture; route other languages to XLM-R."""
 
     def __init__(self, lexical: "CandidateRetriever", english, multilingual):
-        self.lexical = lexical
-        self.english = english
-        self.multilingual = multilingual
+        self.lexical, self.english, self.multilingual = lexical, english, multilingual
+        self.language_counts = Counter()
 
     @staticmethod
     def language(text: str) -> str:
         import langid
-
         return langid.classify(text)[0]
 
-    def ranking(
-        self,
-        text: str,
-        limit: int = 50,
-    ) -> list[str]:
+    def ranking(self, text: str, limit: int = 50) -> list[str]:
         return self.rank_many([text], limit)[0]
 
-    def rank_many(self, texts: list[str], limit: int = 50) -> list[list[str]]:
-        if not texts:
-            return []
-        search_limit = min(len(self.lexical.index.codes), max(limit * 10, 500))
-        focused = [diagnosis_focus(text) for text in texts]
-        english_rows = self.english.search_many(focused, search_limit)
-        multilingual_rows = self.multilingual.search_many(focused, search_limit)
-        results = []
-        for text, english, multilingual in zip(
-            texts, english_rows, multilingual_rows
-        ):
-            english_codes = [code for code, _ in english]
-            multilingual_codes = [code for code, _ in multilingual]
-            weights = [3.0, 1.0] if self.language(text) == "en" else [1.0, 3.0]
-            results.append(reciprocal_rank_fusion(
-                [english_codes, multilingual_codes], weights, limit, constant=10
-            ))
-        return results
+    def retrieve_many(self, texts: list[str], limit: int = 50):
+        """Compute fallback ranks and reranker pools with one embedding per route.
 
-    def candidate_pool_many(
-        self, texts: list[str], limit: int = 50
-    ) -> list[list[str]]:
-        """High-recall pool for a later constrained verifier."""
+        English fallback remains the measured 3:1 English/multilingual mixture.
+        English candidate fusion intentionally preserves its original ordering.
+        Other languages use XLM-R; BM25 contributes only positive lexical matches.
+        """
         if not texts:
-            return []
+            return [], []
+        if limit <= 0:
+            return [[] for _ in texts], [[] for _ in texts]
         search_limit = min(len(self.lexical.index.codes), max(limit * 10, 500))
+        languages = [self.language(text) for text in texts]
+        self.language_counts.update(languages)
         focused = [diagnosis_focus(text) for text in texts]
-        english_rows = self.english.search_many(focused, search_limit)
-        multilingual_rows = self.multilingual.search_many(focused, search_limit)
-        pools = []
-        for text, english, multilingual in zip(
-            texts, english_rows, multilingual_rows
-        ):
-            lexical = [
-                code for code, _ in self.lexical.focused_ranking(text, search_limit)
-            ]
-            primary = english if self.language(text) == "en" else multilingual
-            primary_codes = [code for code, _ in primary]
-            pools.append(reciprocal_rank_fusion(
-                [primary_codes, lexical], [1.0, 1.0], limit, constant=60
-            ))
-        return pools
+        multilingual = self.multilingual.search_many(focused, search_limit)
+        english_positions = [i for i, lang in enumerate(languages) if lang == "en"]
+        english = {}
+        if english_positions:
+            rows = self.english.search_many([focused[i] for i in english_positions], search_limit)
+            english = dict(zip(english_positions, rows))
+        fallbacks, pools = [], []
+        for i, text in enumerate(texts):
+            multi_codes = [code for code, _ in multilingual[i]]
+            primary = [code for code, _ in english[i]] if i in english else multi_codes
+            if i in english:
+                fallback = reciprocal_rank_fusion([primary, multi_codes], [3.0, 1.0], limit, constant=10)
+            else:
+                fallback = multi_codes[:limit]
+            lexical = [code for code, score in self.lexical.focused_ranking(text, search_limit)
+                       if i in english or score > 0]
+            pools.append(reciprocal_rank_fusion([primary, lexical], [1.0, 1.0], limit, constant=60))
+            fallbacks.append(fallback)
+        return fallbacks, pools
+
+    def rank_many(self, texts: list[str], limit: int = 3) -> list[list[str]]:
+        if limit <= 0:
+            return [[] for _ in texts]
+        fallback, _ = self.retrieve_many(texts, max(limit, 50))
+        return [row[:limit] for row in fallback]
+
+    def candidate_pool_many(self, texts: list[str], limit: int = 50) -> list[list[str]]:
+        return self.retrieve_many(texts, limit)[1]
 
 
 class CandidateRetriever:

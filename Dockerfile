@@ -5,7 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     HF_HUB_DISABLE_XET=1 \
-    TOKENIZERS_PARALLELISM=false
+    TOKENIZERS_PARALLELISM=false \
+    PYTHONPATH=/app/src
 
 COPY requirements.txt .
 RUN --mount=type=secret,id=system_ca \
@@ -52,8 +53,13 @@ RUN --mount=type=secret,id=system_ca \
         --pooling cls --threads 4; \
     rm -rf /tmp/hf-multilingual
 
-COPY scripts/finalize_tokenizers.py scripts/finalize_tokenizers.py
-RUN python scripts/finalize_tokenizers.py
-
-COPY coder/ coder/
+# Keep runtime code, configuration and API dependency installation in two small
+# final layers so model/index layers stay reusable when application code changes.
+COPY . /app/
+RUN --mount=type=secret,id=system_ca \
+    set -eu; \
+    if [ -s /run/secrets/system_ca ]; then export PIP_CERT=/run/secrets/system_ca; fi; \
+    python -m pip install --no-cache-dir -r requirements-api.txt; \
+    python scripts/finalize_tokenizers.py
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 ENTRYPOINT ["python", "-m", "coder"]

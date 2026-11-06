@@ -8,3 +8,12 @@ DECISIONS.md
 README.md
 __pycache__
 **/__pycache__
+
+assets
+experiments
+reports
+docs
+data/translation_eval
+
+.env
+.env.*

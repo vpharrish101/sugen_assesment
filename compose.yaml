@@ -4,7 +4,21 @@ services:
       context: .
       secrets:
         - system_ca
-    network_mode: none
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-5-5}
+      CODER_API_BUDGET_USD: ${CODER_API_BUDGET_USD:-5.5}
+      ANTHROPIC_INPUT_USD_PER_MILLION: ${ANTHROPIC_INPUT_USD_PER_MILLION:-0.5}
+      ANTHROPIC_OUTPUT_USD_PER_MILLION: ${ANTHROPIC_OUTPUT_USD_PER_MILLION:-2.5}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      no_proxy: ${NO_PROXY:-}
+      QWEN_BACKEND: ${QWEN_BACKEND:-}
+      QWEN_MODEL: ${QWEN_MODEL:-hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M}
+      QWEN_ENDPOINT: ${QWEN_ENDPOINT:-http://127.0.0.1:11434}
     cpus: ${CODER_CPUS:-4}
     mem_limit: ${CODER_MEMORY:-6g}
     volumes:
