@@ -1,22 +1,22 @@
-# Ollama ICD reranking experiment
+# MedGemma ICD-11 reranking experiment
 
-Install [Ollama](https://ollama.com/) and Python 3, then pull the model:
+Install Ollama and Python 3. Pull the model once:
 
 ```sh
 ollama pull medgemma1.5:4b
 ```
 
-Run from this directory with Ollama running:
+From this directory, run a four-note technical check and then a clean 60-note comparison:
 
 ```sh
-python run_ollama_experiment.py --limit 4 --output-prefix medgemma-check
-python run_ollama_experiment.py --output-prefix medgemma-full
+python run_ollama_experiment.py --limit 4 --output-prefix medgemma-schema-check
+python run_ollama_experiment.py --output-prefix medgemma-schema
 ```
 
-This MedGemma run keeps the model loaded for 30 minutes and uses the original 8,192-token context, matching the settings in the script used for your first six notes. MedGemma naturally returned ICD codes on dev-006, so the prompt now asks for exact listed codes. The runner accepts either listed codes or numbered positions and rejects unknown or repeated codes. If a response is invalid, it retries once. It stops without saving a fallback prediction if the retry also fails, so `--resume` can retry the same note later.
+The candidate pool is frozen. Each request shows the clinical note, diagnosis-focus hint, and the available `ICD code: title` pairs. It asks MedGemma for **one** code, using an Ollama JSON schema that permits only the listed codes. The next request excludes the code already chosen. Three requests produce three distinct ranked codes. This removes the conflicting candidate numbers that caused MedGemma to mix indices and ICD codes. If the model still returns an invalid response, that note uses its saved retrieval baseline and the report counts a fallback; inference continues. Connection or Ollama server errors still stop the run so they can be diagnosed.
 
-The script uses the frozen SapBERT candidates and supplied 60-note dev set. It writes predictions, trace, and results files with your chosen prefix. `--resume` keeps valid completed predictions and retries interrupted or invalid rows, including fallback rows saved by the old runner. Use a fresh prefix for a clean MedGemma comparison. No Python packages or API keys are needed. The first four MedGemma responses you supplied were replayed successfully in a local smoke test; no MedGemma model is available in this cloud environment for live GPU inference.
+The default output prefix is `medgemma-schema`. Use `--resume --output-prefix medgemma-schema` after an interruption. Old output prefixes cannot be resumed with this method because the prompt and ranking procedure changed; keep the old files for comparison. The run writes predictions, trace, and results files with the selected prefix. `--cpu` forces CPU inference if GPU inference destabilizes the laptop.
 
-If the interrupted command was just `python run_ollama_experiment.py`, resume its default `ollama_*` files with `python run_ollama_experiment.py --resume`. The output prefix must match the interrupted run. Previously successful notes will be kept; the failed dev-006 row will be retried. Its second response, `1E90.0`, `1E90`, `1E90.2`, is now recognized as three valid catalogue candidates.
+This retains the 8,192-token context and 30-minute model lifetime from your fast run. It uses standard-library Python and no external inference calls. The supplied gold labels are read only after the 60-note run to compute top-one, top-three, and score out of 75. The SapBERT retrieval baseline is 27/60 top-one and 44/60 top-three (40.8/75). No MedGemma accuracy claim is possible until the full run completes.
 
-Gold labels are used only for scoring after inference. A model error or invalid choice stops the run and leaves the note unfinished; the script will retry that note on resume. The 50-candidate pool contains a gold code for 59 of the 60 notes. The SapBERT baseline is 27/60 top-one and 44/60 top-three (40.8/75).
+Why this design: the [MedGemma 1.5 technical report](https://arxiv.org/abs/2604.05081) describes stronger EHR understanding, but does not establish ICD-11 coding specialization. The [MedGemma model metadata](https://huggingface.co/google/medgemma-1.5-4b-it) identifies a medical instruction model. [Ollama's API documentation](https://github.com/ollama/ollama/blob/main/docs/api.md#chat-request-structured-outputs) supports a JSON schema in `format`. The local tests verify the request schema, three-code selection, invalid-response fallback, and rejection of old outputs. Live MedGemma inference must be checked on your laptop because the model is not installed in this cloud workspace.
