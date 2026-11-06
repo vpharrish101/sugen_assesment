@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -81,6 +82,14 @@ class QwenRunnerTests(unittest.TestCase):
             codes, *_ = llama_runner.rerank(row, 'http://127.0.0.1:8097')
         self.assertFalse(self_payloads[0]['cache_prompt'])
         self.assertEqual(codes[0], row['candidates'][1]['code'])
+
+    def test_python_passes_cache_ram_limit_to_llama_server(self):
+        args = SimpleNamespace(server_bin='llama-server', model_path=Path('/tmp/qwen.gguf'),
+                               threads=4, gpu_layers=99, cache_ram_mib=0)
+        command = llama_runner.server_command(args)
+        self.assertEqual(command[command.index('--cache-ram') + 1], '0')
+        self.assertEqual(command[command.index('-c') + 1], '4096')
+        self.assertEqual(command[command.index('-np') + 1], '1')
 
 
 if __name__ == '__main__':

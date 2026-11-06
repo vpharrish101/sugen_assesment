@@ -14,14 +14,13 @@ The Ollama script restores the exact Qwen prompt, `format: json`, seed 42, 8,192
 
 ## llama-server with bounded RAM
 
-The separate llama.cpp path uses the same Qwen GGUF but is **not** the measured 38/60 Ollama run. On llama.cpp build `b12144`, `llama-server --help` reports `--cache-ram` defaulting to **8192 MiB**. This stores prompt checkpoints from distinct requests and can look like a memory leak. Start it with the bundled launcher, which disables that cache and idle-slot caching, limits context to 4,096 tokens, uses one slot, and bounds batch sizes:
+The separate llama.cpp path uses the same Qwen GGUF but is **not** the measured 38/60 Ollama run. On llama.cpp build `b12144`, `llama-server --help` reports `--cache-ram` defaulting to **8192 MiB**. This stores prompt checkpoints from distinct requests and can look like a memory leak. The Python runner starts llama-server with `--cache-ram 0` by default, limits context to 4,096 tokens, uses one slot, and bounds batch sizes. It stops the server when inference finishes:
 
 ```sh
-LLAMA_SERVER_BIN=/path/to/llama-server ./start_llama_server.sh /path/to/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
-python test_local_reranker.py --input candidates.jsonl --output qwen-llama-predictions.jsonl
+python test_local_reranker.py --input candidates.jsonl --output qwen-llama-predictions.jsonl --server-bin /path/to/llama-server --model-path /path/to/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
 ```
 
-The launcher defaults to GPU offload; set `LLAMA_GPU_LAYERS=0` for CPU. The client also sends `cache_prompt: false`. On the cloud CPU host, ten distinct roughly 440-token prompts produced **4,715 MiB RSS after every request**, with `--cache-ram 0`; this checks for growth across ten requests, not a guarantee on the laptop or over all 60 notes. Use `ps -C llama-server -o pid,rss,cmd` to watch RSS during a longer run. If a different build does not recognize `--cache-ram`, update llama.cpp rather than silently running without a bound.
+`--cache-ram-mib 0` is the default; pass a positive MiB value if you want a small prompt cache. `--gpu-layers 0` selects CPU. The client also sends `cache_prompt: false`. On the cloud CPU host, ten distinct roughly 440-token prompts produced **4,715 MiB RSS after every request**, with `--cache-ram 0`; this checks for growth across ten requests, not a guarantee on the laptop or over all 60 notes. **This setting bounds only the prompt cache, not total process RAM.** Use `ps -C llama-server -o pid,rss,cmd` to watch RSS during a longer run. If a different build does not recognize `--cache-ram`, update llama.cpp rather than silently running without a bound.
 
 ## Assessment boundary
 
