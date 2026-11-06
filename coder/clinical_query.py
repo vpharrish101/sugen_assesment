@@ -25,8 +25,16 @@ def diagnosis_focus(text: str) -> str:
     for segment in (part.strip() for part in SENTENCE.split(text)):
         if not segment:
             continue
+        # Ambient transcripts can contain a patient's suspected diagnosis.
+        # Only clinician turns are eligible when role labels are available.
+        if re.match(r"(?i)^patient\s*:", segment):
+            continue
         match = DIAGNOSIS_CUE.search(segment)
         if match:
             tail = segment[match.end():].strip(" :-")
+            # A ruled-out candidate is not an assessment. If this removes every
+            # cue, the full note remains available to retrieval below.
+            if re.match(r"(?i)^(?:not\b|no\b|unlikely\b|excluded\b|ruled out\b)", tail):
+                continue
             selected.append(tail or segment)
     return " ".join(selected) or text

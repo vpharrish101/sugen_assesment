@@ -49,3 +49,27 @@ Decision: detect generic assessment/diagnosis cues and search their trailing tex
 Commit: `Add diagnosis-focused family retrieval`.
 
 Decision: preserve the top 25 focused results, add up to 10 new full-note results, then round-robin actual members of at most five dot-prefix families until 50 candidates. Alternatives: infer a WHO graph, expand all prefix matches, or use focused results alone. Evidence: every dotted code in the supplied catalogue has its root present, while official parent edges are absent. The bounded pool raises exact gold recall@50 from the control's 31/60 to 40/60 and recall@25 to 38/60. Family expansion never fabricates codes and begins after the top 25, so clinical ranking remains a separate future step. These pool sizes were selected after a small dev comparison and therefore require validation beyond dev. Revisit once a semantic retriever and constrained reranker exist.
+
+## 2026-11-05 14:06 UTC — Prepare ontology-encoder evaluation before choosing a checkpoint
+
+Commit: `Prepare biomedical dense retrieval benchmark`.
+
+Decision: build a frozen local dense-index path around a pinned encoder, precomputed normalized title vectors, catalogue hashes, and reciprocal-rank fusion, while leaving the measured focused strategy as the runtime default until checkpoints are compared. Shortlist English SapBERT and multilingual SapBERT-XLMR; use a character TF-IDF control, and reject BioBERT alone because masked-language pretraining does not directly train synonym retrieval. Evidence: the 20 recall@50 misses are dominated by aliases and abbreviations such as “jiggers”/“tungiasis”, “vaginal thrush”/“vulvovaginal candidosis”, and “GORD”/“gastro-oesophageal reflux disease”. The official SapBERT repository documents UMLS synonym-pair entity-linking training, CLS pooling, cross-lingual variants, and an MIT license. A local character 3–5 gram control reached 42/60 recall@50 but reduced top-1 from 14 to 13 when fused into final ranking, so it is insufficient as the semantic stage. Also exclude patient turns and negated cue tails from assessment extraction; this preserved 14/60 top-1 and 23/60 top-3 while raising the existing family pool to 41/60 recall@50. Model artifact access is pending activation of the saved Hugging Face CDN policy. Revisit model and fusion defaults only after real checkpoint measurements under the CPU deployment constraint.
+
+## 2026-11-05 15:21 UTC — Select SapBERT CLS after checkpoint controls
+
+Commit: `Add hybrid SapBERT retrieval`.
+
+Decision: use pinned `cambridgeltl/SapBERT-from-PubMedBERT-fulltext` revision `090663c…` with the documented CLS-before-pooler representation. Alternatives: focused BM25, general `all-MiniLM-L6-v2`, official mean-token SapBERT, BioLORD, or a generative LLM. Evidence on the frozen 60 notes: English SapBERT reached 26/60 top-1, 42/60 top-3, and 54/60 recall@50; MiniLM reached 16/28/39 and mean-token SapBERT 24/38/53. BioLORD was not downloaded because its model card declares a nonstandard `other` license and the purpose-built SapBERT result already met the entity-linking need. Pure English dense ranking beat lexical+dense fusion for final top-three, while equal English-dense/BM25 fusion reached 59/60 recall@50 for a future verifier. Revisit with an independent labelled ICD set and a constrained verifier.
+
+## 2026-11-05 15:21 UTC — Keep a lower-weight multilingual encoder
+
+Commit: `Add hybrid SapBERT retrieval`.
+
+Decision: ship pinned multilingual SapBERT-XLMR revision `47b6bd0…`, route with offline `langid`, and fuse English:multilingual at 3:1 for English notes and 1:3 otherwise using RRF constant 10. Alternatives: English only, multilingual only, equal fusion, or an API translation step. Evidence: multilingual-only English performance was 19/60 top-1, 28/60 top-3, and 45/60 recall@50, so it cannot replace English SapBERT. The 3:1 ensemble improved the measured final result to 27/60 top-1 and 44/60 top-3 (40.8/75); all 60 dev notes were classified as English. The brief explicitly warns that hidden notes are not always English, while the cross-lingual model is trained for biomedical entity linking in multiple languages. This adds roughly 1.1 GB of weights and is therefore an accuracy-over-image-size choice. Revisit language routing on labelled multilingual consultation notes.
+
+## 2026-11-05 15:21 UTC — Bake semantic assets and retain lexical fallback
+
+Commit: `Add hybrid SapBERT retrieval`.
+
+Decision: download immutable model revisions and precompute normalized embeddings for all supplied titles during Docker build; run fully offline and fall back by batch to focused BM25. Alternatives: download at runtime, call an embedding API, commit binary weights, or remove fallback. Evidence: build-time title encoding took 254 seconds for English and 411 seconds for multilingual on the managed 5-CPU host. The resulting image was 2.87 GB. Runtime processed 60 notes in 16.3 seconds and 600 repeated texts with unique IDs in 61.2 seconds inside the runner, with no missing or invalid output, under the grading limit of 60 minutes and 16 GB. No API calls or keys are used. Revisit ONNX/int8 export if image transfer or cold-start time becomes material.

@@ -1,9 +1,16 @@
 services:
   coder:
-    build: .
+    build:
+      context: .
+      secrets:
+        - system_ca
     network_mode: none
-    cpus: ${CODER_CPUS:-1}
-    mem_limit: ${CODER_MEMORY:-1g}
+    cpus: ${CODER_CPUS:-4}
+    mem_limit: ${CODER_MEMORY:-6g}
     volumes:
       - ${CODER_INPUT_DIR:-./data}:/in:ro
       - ${CODER_OUTPUT_DIR:-./out}:/out
+
+secrets:
+  system_ca:
+    file: ${CODER_BUILD_CA:-/etc/ssl/certs/ca-certificates.crt}
