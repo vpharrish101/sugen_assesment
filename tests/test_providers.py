@@ -13,6 +13,24 @@ from coder.reranker import Reranker
 
 
 class OutputContractTests(unittest.TestCase):
+    def test_ollama_request_keeps_the_measured_model_settings(self):
+        import io
+        from unittest.mock import Mock
+        from coder.providers.local import LocalReranker
+        local = LocalReranker('ollama', 'http://127.0.0.1:11434', 'configured-qwen', 30)
+        local.client = Mock()
+        local.client.open.return_value = io.BytesIO(json.dumps({
+            'done_reason':'stop', 'message':{'content':'{"choices":[3,1,2]}'},
+        }).encode())
+        self.assertEqual(local.rerank('Note', ['A','B','C'], dict(A='A',B='B',C='C')), ['C','A','B'])
+        request = local.client.open.call_args.args[0]
+        payload = json.loads(request.data)
+        self.assertEqual(request.full_url, 'http://127.0.0.1:11434/api/chat')
+        self.assertEqual(payload['model'], 'configured-qwen')
+        self.assertEqual(payload['options'], {'temperature':0,'seed':42,'num_ctx':8192,'num_predict':256})
+        self.assertEqual(payload['format'], 'json')
+        self.assertFalse(payload['stream'])
+
     def test_numbers_are_strict_distinct_and_bounded(self):
         self.assertEqual(parse_choices('{"choices":[2,1,3]}', ['A', 'B', 'C']), ['B', 'A', 'C'])
         for choices in ([1, 1, 3], [1, 2, 4], [True, 2, 3], [1, 2], ['1', '2', '3']):
@@ -65,6 +83,19 @@ class OutputContractTests(unittest.TestCase):
             self.assertTrue(all(row['codes'][0] == 'A' for row in rows))
             self.assertEqual(call.call_count, 3)
             self.assertEqual(summary['routes'], {'retrieval':7})
+
+    def test_time_cap_skips_inference_but_completes_notes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogue, source, output = root/'mms.json', root/'notes.jsonl', root/'out.jsonl'
+            catalogue.write_text(json.dumps([{'code':'A','title':'Asthma'}, {'code':'B','title':'Pneumonia'}, {'code':'C','title':'Diabetes'}]))
+            source.write_text('\n'.join(json.dumps({'id':str(i), 'text':'Asthma'}) for i in range(4)))
+            with (patch.dict(os.environ, {'QWEN_BACKEND':'ollama'}, clear=True),
+                  patch('coder.providers.local.LocalReranker.rerank') as call):
+                summary = run(source, output, catalogue, semantic_assets=root/'missing', max_seconds=0.000001)
+            call.assert_not_called()
+            self.assertEqual(len(output.read_text().splitlines()), 4)
+            self.assertEqual(summary['reranker_disabled_reason'], 'inference time budget reached')
 
 
 @unittest.skipUnless(importlib.util.find_spec('anthropic'), 'install requirements-api.txt')

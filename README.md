@@ -20,8 +20,8 @@ The historical branch name `qwen3b-prototype` refers to that 4B model. Haiku API
 
 Added data: pinned public English/multilingual [SapBERT](https://github.com/cambridgeltl/SapBERT) weights (UMLS entity linking), build-generated title vectors, and reviewed assistant translations of six existing cases into Spanish/Chinese. No new clinical cases or labelled training set were invented. No WHO definitions were added. Models/provenance and all controlled results are documented in [multilingual evaluation](docs/MULTILINGUAL_RETRIEVAL.md).
 
-Beyond dev: 18 paired-language fixtures, offline/no-key and outage coverage, provider SDK contract/proxy/budget tests, catalogue validation and a 600-note repeated-text throughput check. Translations are not independent clinical validation; their extraction path gives Spanish 2/6 top-1, 3/6 top-3 and Chinese 0/6, 2/6. Full results and remaining submission checks: [brief audit](docs/BRIEF_CHECK.md).
+Validation: 35 tests passed, exact fresh-clone Compose run passed, all 60 candidate lists preserved, and 600 repeated-text notes completed offline in 65 seconds at 1.68 GiB RAM. Beyond dev: 18 paired-language fixtures and SDK/proxy/budget/outage checks. Translations are not independent clinical validation; their extraction path gives Spanish 2/6 top-1, 3/6 top-3 and Chinese 0/6, 2/6. Full results and remaining submission checks: [brief audit](docs/BRIEF_CHECK.md).
 
 AI error caught: early research called `1F51.Z` chickenpox; the supplied catalogue identifies it as African trypanosomiasis. Catalogue validation and title-constrained selection replaced free code guessing. A final SDK test also caught an unsupported `temperature` argument before deployment.
 
-Hours spent: **TODO: enter your actual total before submitting**. History is preserved; decisions are in [DECISIONS.md](DECISIONS.md). Deliver a bundle with `git bundle create yourname.bundle --all`; send it yourself on the assessment email thread.
+Hours spent: **TODO: enter your actual total before submitting**. History is preserved; decisions are in [DECISIONS.md](DECISIONS.md). Bundle creation and email submission are deferred at your request.
