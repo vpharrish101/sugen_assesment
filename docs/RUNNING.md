@@ -56,3 +56,13 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
 Provider tests use the **real Anthropic SDK with MockTransport**, not paid inference: success, 429/no retry, forced-tool serialization, proxy configuration, budget exhaustion and complete fallback coverage. A live API check still requires a configured key and allowed API egress. Translation fixtures are evaluation data, not training material; see `data/translation_eval/README.md`. Detailed final results and unmet submission items are in `docs/BRIEF_CHECK.md`.
+
+## Docker with host Ollama
+
+Set `QWEN_BACKEND=ollama`, `QWEN_MODEL` and `QWEN_ENDPOINT=http://127.0.0.1:11434` in `.env`. Run the existing host Ollama service with the model installed. Use the optional override:
+
+```sh
+docker compose -f compose.yaml -f compose.qwen.yaml run --rm coder /in/notes.jsonl /out/predictions.jsonl
+```
+
+The default automatic route remains Claude → configured Qwen → retrieval; with no Claude key it starts with Qwen. Add `--backend ollama` for Qwen-only testing. The override changes networking only and keeps model/key settings in `.env`. Linux Docker supports host networking directly; Docker Desktop requires a supported version with host networking enabled. Without this override, the container's localhost does not reach host Ollama. The ordinary grading/API-only Compose invocation stays unchanged.

@@ -129,3 +129,9 @@ Commit: `Harden optional services and verify complete Docker smoke`. Decision: u
 ## 2026-11-06 17:39 UTC — Complete three-case reliability and Docker smoke
 
 Commit: `Harden optional services and verify complete Docker smoke`. Decision: test the full CLI with its actual SDK, official base URL, real encoders and a non-forwarding HTTPS CONNECT proxy, then rebuild and verify the final image/Compose setup. Reuse only three clinical inputs across scenarios. Evidence: 51 tests passed in 60.757s; four CLI methods passed again in the rebuilt image; exact Compose invocation emitted all three valid predictions in 7.1874s at 1,475.9 MiB; pip check, fake-key/model/proxy forwarding, CPU settings, asset/source integrity and no-key helper checks passed. Fault injection exposed startup/cleanup exceptions and partial batch handling that could fail or lose predictions; fixed those boundaries and redacted key diagnostics. Ranking, prompt and models unchanged. No new runtime dependencies, paid calls, live account access, large dataset run, commit, push, bundle or email. Revisit real account/model access only when credentials become available.
+
+## 2026-11-06 18:09 UTC — Optional host Ollama access from Docker
+
+Commit: `Add optional host networking override for local Qwen`.
+
+Decision requested by user: commit `compose.qwen.yaml` on the final branch. The override changes only network_mode to host; provider/model/key settings remain in the base Compose file and .env. Alternatives: alter the default grading network or permit non-loopback Qwen endpoints. Evidence: the current local client deliberately accepts loopback only; merged Compose configuration is checked for host networking and preserved environment/model settings. No model inference or live host Ollama connectivity is claimed in this configuration-only check. Revisit bridge networking only if needed on another Docker platform.

@@ -1,0 +1,6 @@
+# Optional access to Ollama running on the host's loopback interface.
+# Model/provider settings remain in .env and the base Compose configuration.
+# Linux: supported directly. Docker Desktop: enable host networking first.
+services:
+  coder:
+    network_mode: host
