@@ -11,7 +11,7 @@ import urllib.request
 
 from test_local_reranker import make_messages
 
-MODEL = 'hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M'
+MODEL = 'medgemma1.5:4b'
 
 
 def parse_choices(content, count):
@@ -42,21 +42,23 @@ def make_payload(row, model, cpu=False, retry=False):
     messages[0]['content'] = (
         'Choose the three best ICD-11 candidates for the current diagnosis. '
         'Use the clinical note and candidate titles; ignore negated or historical conditions. '
-        'Reply with one JSON object whose "choices" field is a list of three distinct '
-        'candidate numbers in best-first order. No explanation.'
+        'Each candidate has a numbered position before its ICD code. Reply with one '
+        'JSON object whose "choices" field contains three distinct position numbers '
+        'in best-first order. Do not put ICD codes in "choices". No explanation.'
     )
     if retry:
         messages[0]['content'] = (
-            'Output a single JSON object with exactly one key, "choices", whose value '
-            'is three distinct candidate numbers in best-first order. No other text.'
+            'The previous output was invalid. Use only the integer position numbers '
+            'before candidate titles, not ICD codes. Return exactly three distinct '
+            'position numbers in a JSON "choices" array, best first. No other text.'
         )
         messages[1]['content'] += '\n\nReturn only the three candidate numbers in a JSON choices array.'
-    options = {'temperature': 0, 'seed': 42, 'num_ctx': 3072,
-               'num_batch': 64, 'num_predict': 384 if retry else 256}
+    options = {'temperature': 0, 'seed': 42, 'num_ctx': 8192,
+               'num_predict': 384 if retry else 256}
     if cpu:
         options['num_gpu'] = 0
     return {'model': model, 'messages': messages, 'stream': False,
-            'format': 'json', 'keep_alive': 0, 'options': options}
+            'format': 'json', 'keep_alive': '30m', 'options': options}
 
 
 def valid_resume_rows(output, trace_path):
@@ -141,7 +143,7 @@ def main():
             seconds = round(time.perf_counter() - started, 3)
             traces.write(json.dumps({'id': row['id'], 'seconds': seconds,
                 'fallback_error': None, 'attempts': attempts,
-                'runner_version': 2, 'cpu': args.cpu}) + '\n')
+                'runner_version': 3, 'cpu': args.cpu}) + '\n')
             traces.flush()
             out.write(json.dumps({'id': row['id'], 'codes': codes}) + '\n')
             out.flush()

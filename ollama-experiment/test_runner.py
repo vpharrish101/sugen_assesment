@@ -20,11 +20,11 @@ class OllamaRunnerTests(unittest.TestCase):
 
     def test_memory_options_and_prompt(self):
         payload = make_payload(self.row, 'local-model')
-        self.assertEqual(payload['keep_alive'], 0)
-        self.assertEqual(payload['options']['num_ctx'], 3072)
-        self.assertEqual(payload['options']['num_batch'], 64)
+        self.assertEqual(payload['keep_alive'], '30m')
+        self.assertEqual(payload['options']['num_ctx'], 8192)
         self.assertEqual(payload['format'], 'json')
         self.assertEqual(make_payload(self.row, 'local-model', cpu=True)['options']['num_gpu'], 0)
+        self.assertIn('not ICD codes', make_payload(self.row, 'local-model', retry=True)['messages'][0]['content'])
 
     def test_response_parsing(self):
         for content in ('{"choices":[2,3,9]}',
@@ -33,7 +33,8 @@ class OllamaRunnerTests(unittest.TestCase):
             self.assertEqual(parse_choices(content, 50), [2, 3, 9])
         for content in ('The answer is 2. 1F40', '{"choices":[2]}',
                         '{"choices":[2,2,9]}', '{"choices":[51,3,9]}',
-                        'Example {"choices":[2,3,9]} is wrong'):
+                        'Example {"choices":[2,3,9]} is wrong',
+                        '{"choices":[1E90, 1E90, 1E90]}'):
             with self.assertRaises(ValueError):
                 parse_choices(content, 50)
 
@@ -77,13 +78,16 @@ class OllamaRunnerTests(unittest.TestCase):
                 if isinstance(request, str):
                     return Response({'models': [{'name': runner.MODEL}]})
                 payload = json.loads(request.data)
-                assert payload['keep_alive'] == 0
-                assert payload['options']['num_ctx'] == 3072
+                assert payload['keep_alive'] == '30m'
+                assert payload['options']['num_ctx'] == 8192
                 self.calls += 1
                 if self.calls == 31 and self.fail_once:
                     self.fail_once = False
                     raise OSError('simulated Ollama crash')
-                return Response({'message': {'content': '{"choices":[2,3,9]}'},
+                samples = ('{"choices":[2,12,1]}', '{"choices":[1,2,3]}',
+                           '{"choices":[2, 6, 30]}', '{"choices":[1, 18, 30]}')
+                content = samples[self.calls - 1] if self.calls <= 4 else '{"choices":[2,3,9]}'
+                return Response({'message': {'content': content},
                                  'done_reason': 'stop', 'eval_count': 11})
 
         with tempfile.TemporaryDirectory() as folder:
@@ -99,6 +103,11 @@ class OllamaRunnerTests(unittest.TestCase):
                     runner.main()
             output = root / 'test_predictions.jsonl'
             self.assertEqual(len(output.read_text().splitlines()), 30)
+            first_four = [json.loads(line)['codes'] for line in output.read_text().splitlines()[:4]]
+            candidates = [json.loads(line)['candidates'] for line in (root / 'candidates.jsonl').read_text().splitlines()[:4]]
+            for codes, row_candidates, indices in zip(first_four, candidates,
+                    ([2, 12, 1], [1, 2, 3], [2, 6, 30], [1, 18, 30])):
+                self.assertEqual(codes, [row_candidates[i - 1]['code'] for i in indices])
             with mock.patch.object(runner, '__file__', str(root / 'runner.py')), \
                  mock.patch.object(runner.urllib.request, 'build_opener', return_value=fake), \
                  mock.patch.object(sys, 'argv', ['runner.py', '--output-prefix', 'test', '--resume']), \
