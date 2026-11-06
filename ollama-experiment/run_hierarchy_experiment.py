@@ -36,7 +36,7 @@ def main():
     root = Path(__file__).resolve().parent
     rows = read_jsonl(root / 'candidates.jsonl')
     catalogue = Catalogue(json.loads((root / 'mms-2026-01.json').read_text(encoding='utf-8')))
-    config = {'experiment': 'hierarchy-single-pass-v1', 'model': args.model,
+    config = {'experiment': 'hierarchy-single-pass-v2', 'model': args.model,
               'input_sha256': hashlib.sha256((root / 'candidates.jsonl').read_bytes()).hexdigest(),
               'catalogue_sha256': hashlib.sha256((root / 'mms-2026-01.json').read_bytes()).hexdigest(),
               'candidate_limit': 80, 'expansion_seeds': 10}
@@ -77,6 +77,7 @@ def main():
             traces.write(json.dumps({'id': row['id'], 'seconds': seconds, 'fallback_error': error,
                 'evidence': evidence, 'evidence_valid': evidence_valid, 'response': result,
                 'candidate_codes': [c['code'] for c in candidates],
+                'candidate_ids': [f'C{i:03d}' for i in range(1, len(candidates) + 1)],
                 'added_codes': [c['code'] for c in candidates if not c['retrieved']],
                 'prompt_sha256': hashlib.sha256(json.dumps(payload['messages']).encode()).hexdigest()}) + '\n')
             traces.flush()

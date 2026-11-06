@@ -47,16 +47,18 @@ class HierarchyTests(unittest.TestCase):
         candidates = self.catalogue.expand(row)
         response = lambda choices, evidence: {'message': {'content': json.dumps(
             {'choices': choices, 'evidence': evidence})}}
-        codes, _, grounded = parse_result(response([2, 3, 1], row['text'][:30]), candidates, row['text'])
+        codes, _, grounded = parse_result(response(['C002', 'C003', 'C001'], row['text'][:30]), candidates, row['text'])
         self.assertEqual(codes, [candidates[i - 1]['code'] for i in (2, 3, 1)])
         self.assertTrue(grounded)
-        self.assertFalse(parse_result(response([2, 3, 1], 'invented quotation'), candidates, row['text'])[2])
-        for choices in ([2, 2, 1], [0, 3, 1], [True, 3, 1], ['2', 3, 1]):
+        self.assertFalse(parse_result(response(['C002', 'C003', 'C001'], 'invented quotation'), candidates, row['text'])[2])
+        for choices in (['C002', 'C002', 'C001'], ['C000', 'C003', 'C001'], [2, 3, 1], ['1F40', 'C003', 'C001']):
             with self.assertRaises(ValueError):
                 parse_result(response(choices, ''), candidates, row['text'])
         payload = make_payload(row, candidates, runner.MODEL)
         self.assertIsInstance(payload['format'], dict)
         self.assertIn('parent=', payload['messages'][1]['content'])
+        for candidate in candidates:
+            self.assertNotIn(candidate['code'], payload['messages'][1]['content'])
 
     def test_four_note_resume_then_full_run_has_exactly_one_call_per_note(self):
         class Response:
@@ -77,7 +79,7 @@ class HierarchyTests(unittest.TestCase):
                 self.calls += 1
                 payload = json.loads(request.data)
                 note = payload['messages'][1]['content'].split('CLINICAL NOTE\n')[1].split('\n\nDIAGNOSIS-FOCUS HINT')[0]
-                choices = [1, 1, 2] if self.calls == 3 else [2, 3, 1]
+                choices = ['C001', 'C001', 'C002'] if self.calls == 3 else ['C002', 'C003', 'C001']
                 return Response({'message': {'content': json.dumps({'choices': choices, 'evidence': note[:30]})}})
 
         with tempfile.TemporaryDirectory() as folder:
