@@ -4,3 +4,8 @@ out/*
 !out/.gitkeep
 .env
 *.bundle
+ollama-experiment/*_predictions.jsonl
+ollama-experiment/*_trace.jsonl
+ollama-experiment/*_results.json
+ollama-experiment/*_run.json
+ollama-experiment/*.server.log

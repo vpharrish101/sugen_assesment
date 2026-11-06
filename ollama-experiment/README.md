@@ -1,5 +1,7 @@
 # Qwen ICD-11 reranking prototype
 
+The new single-pass hierarchy experiment is documented in [HIERARCHY.md](HIERARCHY.md). Run `run_hierarchy_experiment.py` for that experiment; the original `run_ollama_experiment.py` below remains the measured baseline.
+
 This folder contains the frozen 60-note, 50-candidate experiment. The Qwen3 4B Q4 model reranked the supplied catalogue candidates on the user's RTX 4060 laptop with **38/60 top-one, 49/60 top-three, 52.08/75**, zero fallbacks, and 38.2 seconds total inference time. The same retrieval baseline scored 27/60, 44/60, 40.83/75. MedGemma 1.5 4B scored 31/60, 52/60, 47.50/75 in a separate local run. These are development results, not hidden-set estimates.
 
 ## Reproduce the measured Ollama run

@@ -85,3 +85,9 @@ Decision: restore the exact Qwen3 4B Ollama prompt and settings used in the loca
 Commit: `Restore Qwen prototype and bound llama-server RAM`.
 
 Decision: launch llama.cpp build b12144 with `--cache-ram 0`, `--no-cache-idle-slots`, one slot, a 4,096-token context, and bounded batch sizes; disable per-request prompt caching in the llama-server client. Alternative: leave the server's 8,192 MiB default RAM prompt cache enabled or restart the process periodically. Evidence: `llama-server --help` documents that default; with caching disabled, ten distinct roughly 440-token prompts held resident memory at 4,715 MiB after each request on the cloud CPU host. This is a limited memory probe and does not prove laptop behavior over 60 notes. Revisit if the user's laptop still shows growth with the same flags.
+
+## 2026-11-06 16:56 IST — Single-pass hierarchy context
+
+Commit: `Add single-pass Qwen hierarchy prototype`, on `qwen-hierarchy-prototype`.
+
+Decision: preserve the measured Qwen model and frozen 50-candidate retrieval pool, add at most 30 catalogue-backed relatives, and annotate each candidate with its coded parent and residual type before one Qwen call. Alternative: a second verification call, another medical model, or a graph service. Evidence: all 12,917 lower-level catalogue categories have a shorter coded prefix at the preceding depth; the expanded pools average 60.2 candidates, never exceed 80, and retain the original 59/60 gold coverage. The largest new prompt tokenizes to 2,614 tokens on the local Qwen runtime. A real CPU/llama.cpp smoke check returned three valid rankings and one repeated-choice response; the validator rejects the latter and the runner falls back to retrieval without another inference. Quoted evidence is checked against the note and reported separately from code validity. No full-set accuracy gain has been measured. Revisit after the laptop's 60-note comparison against 38/60 top-one and 49/60 top-three.
