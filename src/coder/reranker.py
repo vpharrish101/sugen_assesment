@@ -3,6 +3,7 @@ from collections import Counter
 import os
 import math
 import time
+import sys
 
 from .providers.local import LocalReranker
 
@@ -14,6 +15,7 @@ class Reranker:
         self.routes = Counter()
         self.errors = {}
         self.api = None
+        self._api_key = os.getenv('ANTHROPIC_API_KEY', '')
         if backend in {'auto', 'anthropic'} and os.getenv('ANTHROPIC_API_KEY'):
             try:
                 from .providers.anthropic import AnthropicReranker
@@ -30,18 +32,28 @@ class Reranker:
                 self.api = AnthropicReranker(os.environ['ANTHROPIC_API_KEY'], api_model, timeout,
                                              budget, input_rate, output_rate)
                 self.clients.append(('anthropic', self.api))
-            except (ImportError, ValueError) as exc:
-                self.errors['anthropic_setup'] = str(exc)
+            except Exception as exc:
+                self.record_error('anthropic_setup', exc)
         # Automatic mode uses Qwen only if the user explicitly configures it.
         # No local model is downloaded or launched during grading.
         local_backend = backend if backend in {'ollama', 'llama'} else os.getenv('QWEN_BACKEND', '')
         if backend != 'none' and local_backend:
-            if local_backend not in {'ollama', 'llama'}:
-                raise ValueError('QWEN_BACKEND must be ollama or llama')
-            local_model = os.getenv('QWEN_MODEL', model)
-            local_endpoint = os.getenv('QWEN_ENDPOINT', endpoint)
-            client = LocalReranker(local_backend, local_endpoint, local_model, timeout)
-            self.clients.append(('qwen', client))
+            try:
+                if local_backend not in {'ollama', 'llama'}:
+                    raise ValueError('QWEN_BACKEND must be ollama or llama')
+                local_model = os.getenv('QWEN_MODEL', model)
+                local_endpoint = os.getenv('QWEN_ENDPOINT', endpoint)
+                client = LocalReranker(local_backend, local_endpoint, local_model, timeout)
+                self.clients.append(('qwen', client))
+            except Exception as exc:
+                self.record_error('qwen_setup', exc)
+
+    def record_error(self, stage, exc):
+        detail = f'{type(exc).__name__}: {exc}'
+        if self._api_key:
+            detail = detail.replace(self._api_key, '[REDACTED]')
+        self.errors[stage] = detail
+        print(f'coder: {stage}: {detail}', file=sys.stderr)
 
     def rerank(self, text, candidates, titles, timeout):
         started = time.monotonic()
@@ -58,10 +70,13 @@ class Reranker:
                 # SDK errors and local transport/validation failures share the
                 # same fallback boundary. Interrupts still propagate normally.
                 self.failures[name] += 1
-                self.errors[name] = f'{type(exc).__name__}: {exc}'
+                self.record_error(name, exc)
         self.routes['retrieval'] += 1
         return None
 
     def close(self):
         if self.api:
-            self.api.close()
+            try:
+                self.api.close()
+            except Exception as exc:
+                self.record_error('anthropic_close', exc)

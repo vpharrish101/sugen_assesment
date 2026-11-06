@@ -73,13 +73,15 @@ def run(
             raise ValueError("reranking requires the hybrid strategy")
         backend = "none"
     started = time.perf_counter()
+    with input_path.open(encoding="utf-8") as source:
+        notes = list(read_notes(source))
     index = BM25.from_file(mms_path)
     retriever = CandidateRetriever(index)
     hybrid, fallback_reason = None, None
     if strategy == "hybrid":
         try:
             hybrid = load_hybrid(index, semantic_assets, threads)
-        except (ImportError, OSError, RuntimeError, ValueError) as error:
+        except (ImportError, OSError, RuntimeError, ValueError, KeyError, TypeError, AttributeError) as error:
             fallback_reason = str(error)
             print(f"coder: semantic fallback: {error}", file=sys.stderr)
     reranker = Reranker(backend, model, endpoint, timeout_seconds) if backend != "none" else None
@@ -88,8 +90,6 @@ def run(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     count = fallback_batches = reranked = llm_failures = 0
     disabled_reason = None
-    with input_path.open(encoding="utf-8") as source:
-        notes = list(read_notes(source))
     with ExitStack() as stack:
         if reranker:
             stack.callback(reranker.close)
@@ -104,10 +104,16 @@ def run(
             if hybrid is not None:
                 try:
                     batch_fallbacks, pools = hybrid.retrieve_many([note['text'] for note in batch], candidate_limit)
+                    if len(batch_fallbacks) != len(batch) or len(pools) != len(batch):
+                        raise ValueError('semantic retriever returned the wrong number of notes')
+                    for codes in batch_fallbacks + pools:
+                        if not codes or len(set(codes)) != len(codes) or not set(codes) <= valid:
+                            raise ValueError('semantic retriever returned invalid candidates')
                     batch_fallbacks = [codes[:3] for codes in batch_fallbacks]
-                except (OSError, RuntimeError, ValueError) as error:
+                except (OSError, RuntimeError, ValueError, KeyError, TypeError, AttributeError) as error:
                     print(f"coder: semantic batch fallback: {error}", file=sys.stderr)
                     fallback_batches += 1
+                    batch_fallbacks = pools = None
             if batch_fallbacks is None:
                 rank = index.search if strategy == 'baseline' else retriever.focused_ranking
                 batch_fallbacks = [[code for code, _ in rank(note['text'], 3)] for note in batch]
