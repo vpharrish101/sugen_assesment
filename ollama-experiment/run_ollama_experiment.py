@@ -15,11 +15,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', default=MODEL)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--limit', type=int, help='Run only the first N notes as a technical check')
+    parser.add_argument('--output-prefix', default='ollama', help='Prefix for output files')
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
     rows = [json.loads(x) for x in (root / 'candidates.jsonl').read_text(encoding='utf-8').splitlines()]
-    output = root / 'ollama_predictions.jsonl'
-    trace_path = root / 'ollama_trace.jsonl'
+    if not args.output_prefix.replace('-', '').replace('_', '').isalnum():
+        parser.error('output prefix must contain only letters, numbers, hyphens or underscores')
+    output = root / (args.output_prefix + '_predictions.jsonl')
+    trace_path = root / (args.output_prefix + '_trace.jsonl')
+    if not args.resume and (output.exists() or trace_path.exists()):
+        parser.error('output files already exist; choose a new --output-prefix or use --resume')
     done = set()
     if args.resume and output.exists():
         done = {json.loads(x)['id'] for x in output.read_text(encoding='utf-8').splitlines()}
@@ -31,17 +37,18 @@ def main():
         raise SystemExit('Install the model first:\nollama pull ' + args.model)
     mode = 'a' if args.resume else 'w'
     with output.open(mode, encoding='utf-8') as out, trace_path.open(mode, encoding='utf-8') as traces:
-        for row in rows:
+        for row in rows[:args.limit] if args.limit else rows:
             if row['id'] in done:
                 continue
-            schema = {'type': 'object', 'properties': {
-                'assessment': {'type': 'string', 'maxLength': 240},
-                'choices': {'type': 'array', 'items': {'type': 'integer', 'minimum': 1,
-                    'maximum': len(row['candidates'])}, 'minItems': 3, 'maxItems': 3}},
-                'required': ['assessment', 'choices'], 'additionalProperties': False}
-            payload = {'model': args.model, 'messages': make_messages(row),
-                'stream': False, 'format': schema, 'keep_alive': '30m',
-                'options': {'temperature': 0, 'seed': 42, 'num_ctx': 8192, 'num_predict': 180}}
+            messages = make_messages(row)
+            messages[0]['content'] = messages[0]['content'].split('First write one short sentence')[0] + (
+                'Return only a JSON object in exactly this shape: '
+                '{"choices":[1,2,3]}. Replace the numbers with three distinct candidate '
+                'numbers, best first. No explanation or markdown.'
+            )
+            payload = {'model': args.model, 'messages': messages,
+                'stream': False, 'format': 'json', 'keep_alive': '30m',
+                'options': {'temperature': 0, 'seed': 42, 'num_ctx': 8192, 'num_predict': 256}}
             started = time.perf_counter()
             result, error = None, None
             try:
@@ -64,6 +71,11 @@ def main():
                 'fallback_error': error, 'response': result}) + '\n')
             traces.flush()
             print(f'{row["id"]}: {seconds:.1f}s' + (f' FALLBACK: {error}' if error else ''), flush=True)
+            if error:
+                raise SystemExit('Stopped after an invalid response; inspect the trace before continuing.')
+    if len({json.loads(x)['id'] for x in output.read_text(encoding='utf-8').splitlines()}) != len(rows):
+        print(f'Partial run complete. Predictions: {output.name}; no full-set score yet.')
+        return
     gold = {r['id']: set(r['gold']) for r in map(json.loads,
         (root / 'dev_notes.jsonl').read_text(encoding='utf-8').splitlines())}
     preds = {r['id']: r['codes'] for r in map(json.loads, output.read_text().splitlines())}
@@ -79,7 +91,7 @@ def main():
         'total_seconds': sum(t['seconds'] for t in traces),
         'external_inference_calls': 0,
         'input_sha256': hashlib.sha256((root / 'candidates.jsonl').read_bytes()).hexdigest()}
-    (root / 'results.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+    (root / (args.output_prefix + '_results.json')).write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps(report, indent=2))
 
 
