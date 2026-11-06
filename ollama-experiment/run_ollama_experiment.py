@@ -14,8 +14,8 @@ from test_local_reranker import make_messages
 MODEL = 'medgemma1.5:4b'
 
 
-def parse_choices(content, count):
-    """Read a complete ranking; refuse to guess from truncated prose."""
+def parse_choices(content, candidates):
+    """Accept candidate positions or exact catalogue codes in the choices array."""
     if not isinstance(content, str) or not content.strip():
         raise ValueError('Ollama returned empty content')
     stripped = content.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
@@ -27,14 +27,27 @@ def parse_choices(content, count):
     if isinstance(value, dict):
         value = value.get('choices')
     if value is None:
+        match = re.fullmatch(r'\s*\{\s*"choices"\s*:\s*\[([^\]]+)\]\s*\}\s*', stripped, re.S)
+        if match:
+            value = [part.strip().strip('"') for part in match.group(1).split(',')]
+    if value is None:
         match = re.fullmatch(r'\s*(\d{1,2})\s*[,;\s]+\s*(\d{1,2})\s*[,;\s]+\s*(\d{1,2})\s*', stripped)
         if match:
             value = [int(x) for x in match.groups()]
-    if (not isinstance(value, list) or len(value) != 3 or
-            any(type(i) is not int or not 1 <= i <= count for i in value) or
-            len(set(value)) != 3):
+    if not isinstance(value, list) or len(value) != 3:
         raise ValueError('No valid three-choice ranking in response: ' + repr(content[:160]))
-    return value
+    by_code = {candidate['code']: i for i, candidate in enumerate(candidates, 1)}
+    indices = []
+    for item in value:
+        if type(item) is int and 1 <= item <= len(candidates):
+            indices.append(item)
+        elif isinstance(item, str) and item in by_code:
+            indices.append(by_code[item])
+        else:
+            raise ValueError('Unknown candidate in response: ' + repr(item))
+    if len(set(indices)) != 3:
+        raise ValueError('Repeated candidate in response: ' + repr(content[:160]))
+    return indices
 
 
 def make_payload(row, model, cpu=False, retry=False):
@@ -42,17 +55,17 @@ def make_payload(row, model, cpu=False, retry=False):
     messages[0]['content'] = (
         'Choose the three best ICD-11 candidates for the current diagnosis. '
         'Use the clinical note and candidate titles; ignore negated or historical conditions. '
-        'Each candidate has a numbered position before its ICD code. Reply with one '
-        'JSON object whose "choices" field contains three distinct position numbers '
-        'in best-first order. Do not put ICD codes in "choices". No explanation.'
+        'Reply with one JSON object whose "choices" field contains three distinct '
+        'ICD codes copied exactly from the supplied candidate list, best first. '
+        'Do not invent codes or repeat a code. No explanation.'
     )
     if retry:
         messages[0]['content'] = (
-            'The previous output was invalid. Use only the integer position numbers '
-            'before candidate titles, not ICD codes. Return exactly three distinct '
-            'position numbers in a JSON "choices" array, best first. No other text.'
+            'The previous output was invalid. Return a JSON "choices" array with '
+            'three distinct ICD codes copied exactly from the candidate list, '
+            'best first. Do not invent codes. No other text.'
         )
-        messages[1]['content'] += '\n\nReturn only the three candidate numbers in a JSON choices array.'
+        messages[1]['content'] += '\n\nReturn only three distinct listed ICD codes in a JSON choices array.'
     options = {'temperature': 0, 'seed': 42, 'num_ctx': 8192,
                'num_predict': 384 if retry else 256}
     if cpu:
@@ -120,7 +133,7 @@ def main():
                                'prompt_eval_count': result.get('prompt_eval_count')}
                     attempts.append(attempt)
                     try:
-                        choices = parse_choices(content, len(row['candidates']))
+                        choices = parse_choices(content, row['candidates'])
                         codes = [row['candidates'][i - 1]['code'] for i in choices]
                         break
                     except ValueError as exc:
@@ -143,7 +156,7 @@ def main():
             seconds = round(time.perf_counter() - started, 3)
             traces.write(json.dumps({'id': row['id'], 'seconds': seconds,
                 'fallback_error': None, 'attempts': attempts,
-                'runner_version': 3, 'cpu': args.cpu}) + '\n')
+                'runner_version': 4, 'cpu': args.cpu}) + '\n')
             traces.flush()
             out.write(json.dumps({'id': row['id'], 'codes': codes}) + '\n')
             out.flush()

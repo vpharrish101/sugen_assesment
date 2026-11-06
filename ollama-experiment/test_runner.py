@@ -24,19 +24,24 @@ class OllamaRunnerTests(unittest.TestCase):
         self.assertEqual(payload['options']['num_ctx'], 8192)
         self.assertEqual(payload['format'], 'json')
         self.assertEqual(make_payload(self.row, 'local-model', cpu=True)['options']['num_gpu'], 0)
-        self.assertIn('not ICD codes', make_payload(self.row, 'local-model', retry=True)['messages'][0]['content'])
+        self.assertIn('ICD codes', make_payload(self.row, 'local-model', retry=True)['messages'][0]['content'])
 
     def test_response_parsing(self):
         for content in ('{"choices":[2,3,9]}',
                         '```json\n{"choices":[2,3,9]}\n```',
                         '2,3,9'):
-            self.assertEqual(parse_choices(content, 50), [2, 3, 9])
+            self.assertEqual(parse_choices(content, self.row['candidates']), [2, 3, 9])
         for content in ('The answer is 2. 1F40', '{"choices":[2]}',
                         '{"choices":[2,2,9]}', '{"choices":[51,3,9]}',
-                        'Example {"choices":[2,3,9]} is wrong',
-                        '{"choices":[1E90, 1E90, 1E90]}'):
+                        'Example {"choices":[2,3,9]} is wrong'):
             with self.assertRaises(ValueError):
-                parse_choices(content, 50)
+                parse_choices(content, self.row['candidates'])
+        row = json.loads((Path(__file__).parent / 'candidates.jsonl').read_text().splitlines()[5])
+        self.assertEqual(parse_choices('{"choices":["1E90.0","1E90","1E90.2"]}', row['candidates']), [3, 4, 29])
+        with self.assertRaises(ValueError):
+            parse_choices('{"choices":[1,4,1E90]}', row['candidates'])
+        with self.assertRaises(ValueError):
+            parse_choices('{"choices":["1E90.0","1E90","1E90.9"]}', row['candidates'])
 
     def test_resume_retries_failed_and_half_written_rows(self):
         with tempfile.TemporaryDirectory() as folder:
