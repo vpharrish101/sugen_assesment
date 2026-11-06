@@ -22,7 +22,13 @@ Hybrid SapBERT retrieval: -
 <img width="845" height="873" alt="image" src="https://github.com/user-attachments/assets/a40f44c0-5dac-4f90-9d9d-64751b0c737a" />
 
 Retrieval with LLM reranking: -
+<img width="845" height="873" alt="image" src="https://github.com/user-attachments/assets/1a22f972-2e53-4259-ad66-2b3792e96169" />
 
+Single-pass hierarchy aware reranking: -
+<img width="845" height="873" alt="image" src="https://github.com/user-attachments/assets/437cc4f4-7fc0-4a18-930a-c21f73f18879" />
+
+Two-pass hierarchy verification: -
+<img width="845" height="873" alt="image" src="https://github.com/user-attachments/assets/046f534f-1131-4bac-b910-7664e7dd15f2" />
 
 2. Workflow decisions, and other points: -
   a. Testing was done between Qwen3 and MedGamma, since the latter is explicitly trained on medical corpus.
