@@ -115,3 +115,9 @@ Decision: no SDK retries, conservative $5.50 reservation with UTF-8 byte/token o
 Commit: `Record final CPU and provider integration validation`.
 
 Decision: keep the implementation unchanged after the clean-clone run, record the reproducible results, and require a later live Haiku check rather than relabel Qwen's score as API performance. Evidence: 35/35 checks passed including actual SDK/real encoders with simulated API HTTP, all 60 candidate pools/fallbacks equal frozen Qwen inputs, official offline score 27/44 (40.83/75), 600 offline notes in 65.03 seconds at 1,719 MiB on four CPUs/6 GB with no missing/invalid output. Three real CPU Qwen requests succeeded with stable 5,292 MiB-class RSS (exact KiB values retained in report). Initial cloud VFS disk exhaustion was resolved by removing only task-created obsolete cache layers and a completed temporary model download; the clean build then passed. Alternative: skip clean-clone/runtime checks or claim unmeasured API quality. Revisit Haiku accuracy, latency and current token pricing when credentials/allowed egress are available. The user explicitly deferred bundle/email; do not create/send them. Main push remains subject to final approval.
+
+## 2026-11-06 16:48 UTC — Preserve parallel main history during integration
+
+Commit: `Merge main history into tested final integration`.
+
+Decision: join the existing main preparation commit as a second parent while retaining the tested integration tree. Evidence: main `a1a85ea` and SapBERT/Qwen share `6f5ce6d` but are parallel descendants; main's patient/negation guards, RRF, dense retrieval builder and tests are already included or superseded in the tested code. Only this decision-log entry changes in the merge. This allows a normal fast-forward update after approval and preserves both histories. Revisit only if remote main changes before the approved push. No remote write has occurred.
