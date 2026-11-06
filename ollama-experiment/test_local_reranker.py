@@ -52,7 +52,7 @@ def rerank(row, endpoint):
         'response_format': {'type': 'json_schema', 'json_schema': {
             'name': 'icd_ranking', 'strict': True, 'schema': schema,
         }},
-        'cache_prompt': True,
+        'cache_prompt': False,
     }
     # Explicitly bypass inherited outbound proxies only for loopback inference.
     # The endpoint is validated below; no remote destinations are supported.

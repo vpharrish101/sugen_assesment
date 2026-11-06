@@ -1,22 +1,30 @@
-# MedGemma ICD-11 reranking experiment
+# Qwen ICD-11 reranking prototype
 
-Install Ollama and Python 3. Pull the model once:
+This folder contains the frozen 60-note, 50-candidate experiment. The Qwen3 4B Q4 model reranked the supplied catalogue candidates on the user's RTX 4060 laptop with **38/60 top-one, 49/60 top-three, 52.08/75**, zero fallbacks, and 38.2 seconds total inference time. The same retrieval baseline scored 27/60, 44/60, 40.83/75. MedGemma 1.5 4B scored 31/60, 52/60, 47.50/75 in a separate local run. These are development results, not hidden-set estimates.
 
-```sh
-ollama pull medgemma1.5:4b
-```
-
-From this directory, run a four-note technical check and then a clean 60-note comparison:
+## Reproduce the measured Ollama run
 
 ```sh
-python run_ollama_experiment.py --limit 4 --output-prefix medgemma-schema-check
-python run_ollama_experiment.py --output-prefix medgemma-schema
+ollama pull hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M
+python run_ollama_experiment.py --limit 4 --output-prefix qwen-check
+python run_ollama_experiment.py --output-prefix qwen-full
 ```
 
-The candidate pool is frozen. Each request shows the clinical note, diagnosis-focus hint, and the available `ICD code: title` pairs. It asks MedGemma for **one** code, using an Ollama JSON schema that permits only the listed codes. The next request excludes the code already chosen. Three requests produce three distinct ranked codes. This removes the conflicting candidate numbers that caused MedGemma to mix indices and ICD codes. If the model still returns an invalid response, that note uses its saved retrieval baseline and the report counts a fallback; inference continues. Connection or Ollama server errors still stop the run so they can be diagnosed.
+The Ollama script restores the exact Qwen prompt, `format: json`, seed 42, 8,192-token context and 256-token output limit from the measured run. It uses no API key and writes `*_predictions.jsonl`, `*_trace.jsonl`, and, after all 60 notes, `*_results.json`. Choose a fresh prefix; do not combine Qwen and MedGemma outputs. Gold labels are read only for the final score. The frozen input SHA256 is `524d4aa5ea7d55ea76d2a42b2b9fed6472c8dda01824fbc30e91d5b723824045`.
 
-The default output prefix is `medgemma-schema`. Use `--resume --output-prefix medgemma-schema` after an interruption. Old output prefixes cannot be resumed with this method because the prompt and ranking procedure changed; keep the old files for comparison. The run writes predictions, trace, and results files with the selected prefix. `--cpu` forces CPU inference if GPU inference destabilizes the laptop.
+## llama-server with bounded RAM
 
-This retains the 8,192-token context and 30-minute model lifetime from your fast run. It uses standard-library Python and no external inference calls. The supplied gold labels are read only after the 60-note run to compute top-one, top-three, and score out of 75. The SapBERT retrieval baseline is 27/60 top-one and 44/60 top-three (40.8/75). No MedGemma accuracy claim is possible until the full run completes.
+The separate llama.cpp path uses the same Qwen GGUF but is **not** the measured 38/60 Ollama run. On llama.cpp build `b12144`, `llama-server --help` reports `--cache-ram` defaulting to **8192 MiB**. This stores prompt checkpoints from distinct requests and can look like a memory leak. Start it with the bundled launcher, which disables that cache and idle-slot caching, limits context to 4,096 tokens, uses one slot, and bounds batch sizes:
 
-Why this design: the [MedGemma 1.5 technical report](https://arxiv.org/abs/2604.05081) describes stronger EHR understanding, but does not establish ICD-11 coding specialization. The [MedGemma model metadata](https://huggingface.co/google/medgemma-1.5-4b-it) identifies a medical instruction model. [Ollama's API documentation](https://github.com/ollama/ollama/blob/main/docs/api.md#chat-request-structured-outputs) supports a JSON schema in `format`. The local tests verify the request schema, three-code selection, invalid-response fallback, and rejection of old outputs. Live MedGemma inference must be checked on your laptop because the model is not installed in this cloud workspace.
+```sh
+LLAMA_SERVER_BIN=/path/to/llama-server ./start_llama_server.sh /path/to/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
+python test_local_reranker.py --input candidates.jsonl --output qwen-llama-predictions.jsonl
+```
+
+The launcher defaults to GPU offload; set `LLAMA_GPU_LAYERS=0` for CPU. The client also sends `cache_prompt: false`. On the cloud CPU host, ten distinct roughly 440-token prompts produced **4,715 MiB RSS after every request**, with `--cache-ram 0`; this checks for growth across ten requests, not a guarantee on the laptop or over all 60 notes. Use `ps -C llama-server -o pid,rss,cmd` to watch RSS during a longer run. If a different build does not recognize `--cache-ram`, update llama.cpp rather than silently running without a bound.
+
+## Assessment boundary
+
+The [brief](../BRIEF.md) grades `docker compose run coder /in/notes.jsonl /out/predictions.jsonl` on **600 unseen notes, 8 CPUs, 16 GiB RAM, no GPU, and 60 minutes**. Runtime networking is limited to OpenAI/Anthropic model APIs, with a shared **US$6** cap. The local Qwen/Ollama and llama-server experiments are not part of that Docker entry point and their GPU timing cannot establish CPU grading feasibility. The current Docker submission path remains the offline SapBERT/BM25 retriever with a no-key fallback. The hidden set also spans more ICD-11 chapters and languages than the 60 English development notes.
+
+Before final submission, the brief separately requires a clean-clone run of the exact Docker command, one output for every ID, an official `score.py` result, evaluation beyond the 60 development labels, a one-page root README with a hidden-score estimate, source data and AI-error disclosure, a contemporaneous `DECISIONS.md`, hours spent, and a `git bundle --all` delivered by email. The Qwen score is evidence for the prototype; it must not replace the deployable runner's score in that README until a compliant runtime path is built and measured.

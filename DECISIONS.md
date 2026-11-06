@@ -73,3 +73,15 @@ Decision: ship pinned multilingual SapBERT-XLMR revision `47b6bd0…`, route wit
 Commit: `Add hybrid SapBERT retrieval`.
 
 Decision: download immutable model revisions and precompute normalized embeddings for all supplied titles during Docker build; run fully offline and fall back by batch to focused BM25. Alternatives: download at runtime, call an embedding API, commit binary weights, or remove fallback. Evidence: build-time title encoding took 254 seconds for English and 411 seconds for multilingual on the managed 5-CPU host. The resulting image was 2.87 GB. Runtime processed 60 notes in 16.3 seconds and 600 repeated texts with unique IDs in 61.2 seconds inside the runner, with no missing or invalid output, under the grading limit of 60 minutes and 16 GB. No API calls or keys are used. Revisit ONNX/int8 export if image transfer or cold-start time becomes material.
+
+## 2026-11-06 10:40 UTC — Keep Qwen as the measured local reranker
+
+Commit: `Restore Qwen prototype and bound llama-server RAM`.
+
+Decision: restore the exact Qwen3 4B Ollama prompt and settings used in the local measured run. Alternative: MedGemma 1.5 4B with constrained catalogue selection. Evidence supplied from the laptop: Qwen reached 38/60 top-one, 49/60 top-three, 52.08/75 in 38.2 seconds; MedGemma reached 31/60, 52/60, 47.50/75 in 136.2 seconds. These are development-set GPU experiments, not Docker grading results. Revisit model choice only after independent notes or a compliant CPU/API runtime is tested.
+
+## 2026-11-06 10:40 UTC — Bound llama-server prompt-cache RAM
+
+Commit: `Restore Qwen prototype and bound llama-server RAM`.
+
+Decision: launch llama.cpp build b12144 with `--cache-ram 0`, `--no-cache-idle-slots`, one slot, a 4,096-token context, and bounded batch sizes; disable per-request prompt caching in the llama-server client. Alternative: leave the server's 8,192 MiB default RAM prompt cache enabled or restart the process periodically. Evidence: `llama-server --help` documents that default; with caching disabled, ten distinct roughly 440-token prompts held resident memory at 4,715 MiB after each request on the cloud CPU host. This is a limited memory probe and does not prove laptop behavior over 60 notes. Revisit if the user's laptop still shows growth with the same flags.
