@@ -55,6 +55,5 @@ RUN --mount=type=secret,id=system_ca \
 COPY scripts/finalize_tokenizers.py scripts/finalize_tokenizers.py
 RUN python scripts/finalize_tokenizers.py
 
-COPY coder/ coder/
-COPY prototype/ prototype/
+COPY . /app/
 ENTRYPOINT ["python", "-m", "prototype"]
