@@ -68,3 +68,16 @@ Commit: `50ae4ca`. Add compose.qwen.yaml for reaching host Ollama through loopba
 ### 2026-11-07 08:09 IST — Private data and branch cleanup
 
 Commit: `11dcc83`. Keep only the public catalogue tracked; remove clinical inputs, derivatives and note-level reports from prepared history. Mount private input externally. Remove frozen/duplicate launchers, retain branch-specific Docker runners, and archive the temporary download branch. Seven distinct builds and three-note smokes passed; publication still needs approval.
+
+### 2026-11-07 — Ship public catalogue vectors
+
+Keep the pinned English and multilingual title matrices in assets/catalogue/ (about 108 MiB total). Native and Docker setup validate and reuse them, while query encoder weights remain downloaded and Git-ignored. Catalogue/model metadata and matrix checksums prevent stale or damaged assets from being used. No clinical data is included.
+
+### 2026-11-07 — Reuse complete semantic assets in Docker
+
+Copy assets/semantic/ into the image instead of downloading encoders and encoding
+the catalogue during each fresh build. Keep the weights Git-ignored and provide
+the Drive download in instructions.md. Copied multilingual tokenizer metadata
+contained a list for extra_special_tokens, while Transformers 4.57.6 expects a
+mapping; passing an empty mapping at load time resolved the laptop smoke test.
+Use the same compatibility option for both SapBERT encoders; no ranking changes.

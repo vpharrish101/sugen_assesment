@@ -9,6 +9,11 @@ Neither directory should be committed. The examples below assume your input is
 Input is JSONL: one object per line with a string `id` and the consultation note
 in a string `text` field. IDs must be unique within the file.
 
+Docker mounts `private-data/` as `/in` (read-only) and `out/` as `/out`.
+For example, `private-data/notes.jsonl` on your machine becomes `/in/notes.jsonl`
+inside the container. To use other host directories, set `CODER_INPUT_DIR` and
+`CODER_OUTPUT_DIR` in `.env`; container paths remain `/in` and `/out`.
+
 ## 1. Anthropic API — Docker
 
 Install Docker with the Compose plugin. Copy the environment template once
@@ -32,6 +37,12 @@ also set `ANTHROPIC_INPUT_USD_PER_MILLION` and
 `ANTHROPIC_OUTPUT_USD_PER_MILLION` to its current prices. The application requires
 explicit prices for a different model. Do not commit your key or `.env`.
 
+Before building, download the complete `semantic/` folder from
+[Google Drive](https://drive.google.com/drive/folders/14W-Rx1LamEf1SWjIal2o-ODjqUqciBfQ?usp=sharing)
+and place it at `assets/semantic/`. Both `english/` and `multilingual/` must
+contain `model/`, `metadata.json` and `title_embeddings.npy`. The matrices alone
+are not enough. Alternatively, generate these assets using section 3 first.
+
 Build and run:
 
 ```bash
@@ -39,10 +50,25 @@ docker compose build coder
 docker compose run --rm coder /in/notes.jsonl /out/predictions.jsonl
 ```
 
-The build prepares the English and multilingual encoders and catalogue index.
-Allow time and internet access for the initial model downloads and asset setup.
-The Drive download below does not bypass these Docker build steps. No GPU is
-required for this path.
+The build copies the prepared encoders and catalogue index. It does not download
+models or regenerate embeddings. Internet access is still needed to install
+Python dependencies on the first build. Pip has a 180-second read timeout and
+10 connection retries; these do not guarantee recovery from every interrupted
+download. No GPU is required for this path.
+
+The tokenizer loader supplies `extra_special_tokens={}` for these SapBERT
+encoders. This handles copied tokenizer metadata that serializes the field as
+an empty list, which Docker's pinned Transformers version cannot load directly.
+
+To check asset loading before inference:
+
+```bash
+docker compose run --rm --entrypoint python coder -c '
+from coder.__main__ import BM25, load_hybrid, DEFAULT_MMS, DEFAULT_SEMANTIC_ASSETS
+load_hybrid(BM25.from_file(DEFAULT_MMS), DEFAULT_SEMANTIC_ASSETS)
+print("Both semantic encoders loaded successfully.")
+'
+```
 
 Automatic routing is Anthropic first, configured local Qwen second, retrieval
 last. With `QWEN_BACKEND` empty, API failures fall back to retrieval. A completed
@@ -142,8 +168,7 @@ Place the downloaded `semantic/` folder under `assets/`, so both
 run `python scripts/finalize_tokenizers.py`, then skip the encoder preparation
 commands below and proceed to running the app.
 The catalogue index stays the same for 60 or 600 notes; it is not rebuilt per
-input dataset. This download is for native setup; the Docker build still
-prepares its own encoders.
+input dataset. The same downloaded assets work for both native Python and Docker.
 
 Alternatively, prepare the query encoders and catalogue vectors once with the
 commands below. They download the pinned encoders and generate the title
@@ -199,3 +224,12 @@ python score.py \
 Use the gold file corresponding to the input notes. Each prediction contains the
 note ID and up to three ranked catalogue codes. Gold labels are used only for
 evaluation, not retrieval or reranking.
+
+To score inside Docker instead:
+
+```bash
+docker compose run --rm --entrypoint python coder score.py \
+  --gold /in/dev_notes.jsonl \
+  --pred /out/predictions.jsonl \
+  --mms data/mms-2026-01.json
+```

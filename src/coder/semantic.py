@@ -32,7 +32,13 @@ class DenseIndex:
         expected_digest = catalogue_digest(lexical_index.records)
         if metadata.get("catalogue_sha256") != expected_digest:
             raise ValueError("semantic assets do not match the supplied catalogue")
-        vectors = np.load(asset_dir / "title_embeddings.npy", mmap_mode="r")
+        vector_path = asset_dir / "title_embeddings.npy"
+        if metadata.get("embeddings_sha256"):
+            with vector_path.open("rb") as source:
+                digest = hashlib.file_digest(source, "sha256").hexdigest()
+            if digest != metadata["embeddings_sha256"]:
+                raise ValueError("semantic embedding checksum mismatch")
+        vectors = np.load(vector_path, mmap_mode="r", allow_pickle=False)
         expected_shape = (len(lexical_index.codes), metadata.get("dimension"))
         if vectors.shape != expected_shape:
             raise ValueError(
@@ -50,6 +56,9 @@ class DenseIndex:
                 model_dir,
                 local_files_only=True,
                 trust_remote_code=False,
+                # Newer saves can serialize this as [], but Transformers 4.57
+                # expects a mapping. These SapBERT encoders need no extra tokens.
+                extra_special_tokens={},
             )
         finally:
             transformers_logging.set_verbosity(previous_verbosity)

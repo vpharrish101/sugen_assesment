@@ -11,6 +11,8 @@ ollama-experiment
 __pycache__
 **/__pycache__
 assets
+!assets/catalogue/
+!assets/catalogue/**
 BRIEF.md
 DECISIONS.md
 README.md
@@ -18,3 +20,11 @@ README.md
 **/*.jsonl
 data/*
 !data/mms-2026-01.json
+
+# Include prepared encoders and vectors for the Docker runtime.
+!assets/
+!assets/semantic/
+!assets/semantic/**
+
+# Keep clinical files excluded even inside an included asset directory.
+**/*.jsonl

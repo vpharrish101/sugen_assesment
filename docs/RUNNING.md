@@ -12,8 +12,11 @@ docker compose run --rm coder /in/notes.jsonl /out/predictions.jsonl
 python score.py --gold private-data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
 ```
 
-The image builds pinned encoder title vectors from the public catalogue, never
-from clinical notes. The grading box needs no GPU or runtime downloads. Compose
+The Docker build copies the complete assets/semantic/ folder, including both
+query encoders and catalogue matrices. Download it from the Drive link in
+instructions.md or prepare it natively before building. Python dependencies are
+installed during the build; no model download or catalogue encoding is run.
+The grading box needs no GPU or runtime encoder downloads. Compose
 forwards ANTHROPIC_API_KEY and HTTPS_PROXY. The API model defaults to
 claude-haiku-5-5. No key means configured Qwen, then offline retrieval. With a key,
 Claude is first; provider failures use Qwen then retrieval. Budget reservation
@@ -39,3 +42,17 @@ CPU/GPU Torch, and supply the built assets locally. Unit checks use
 PYTHONPATH=src python -m unittest discover -s tests. Real-encoder smoke checks are
 optional: set CODER_TEST_ASSETS and CODER_TEST_NOTES to private local paths. They
 read at most three supplied notes. No clinical fixture is required in Git.
+
+## Native setup with the bundled embeddings
+
+Run the same build_semantic_assets commands for English/multilingual as before;
+outputs assets/semantic/english and assets/semantic/multilingual automatically
+reuse assets/catalogue/ after validation. Expect encoder/tokenizer downloads,
+but no catalogue-encoding wait. Runtime still needs the query encoders. Finish
+with python scripts/finalize_tokenizers.py. --rebuild explicitly regenerates
+catalogue embeddings; mismatched/corrupt cached data otherwise fails clearly.
+The runtime also checks the matrix checksum before enabling semantic retrieval.
+
+Copied SapBERT tokenizers are loaded with extra_special_tokens={} to handle empty
+list metadata from newer serializers under pinned Transformers 4.57.6. This does
+not modify catalogue vectors or encoder weights.
