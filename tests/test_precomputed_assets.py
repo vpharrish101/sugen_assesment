@@ -49,13 +49,3 @@ class PrecomputedAssetTests(unittest.TestCase):
         self.assertEqual((output/'title_embeddings.npy').read_bytes(),(self.cache/'title_embeddings.npy').read_bytes())
         self.assertEqual((output/'metadata.json').read_bytes(),(self.cache/'metadata.json').read_bytes())
         model.save_pretrained.assert_called_once()
-
-    def test_checked_in_assets_match_public_catalogue_and_pins(self):
-        root=Path(__file__).resolve().parents[1]
-        records=json.loads((root/'data/mms-2026-01.json').read_text())
-        pins={'english':('cambridgeltl/SapBERT-from-PubMedBERT-fulltext','090663c3ae57bf35ffe4d0d468a2a88d03051a4d'),
-              'multilingual':('cambridgeltl/SapBERT-UMLS-2020AB-all-lang-from-XLMR','47b6bd041ba61311584bb2494edfda5c7d9b719f')}
-        for language,(model,revision) in pins.items():
-            metadata=builder.load_precomputed(root/'assets/catalogue'/language,records,model,revision,'cls',64)
-            self.assertEqual(metadata['dimension'],768)
-            self.assertEqual(len(records),18375)

@@ -43,15 +43,15 @@ PYTHONPATH=src python -m unittest discover -s tests. Real-encoder smoke checks a
 optional: set CODER_TEST_ASSETS and CODER_TEST_NOTES to private local paths. They
 read at most three supplied notes. No clinical fixture is required in Git.
 
-## Native setup with the bundled embeddings
+## Native semantic assets
 
-Run the same build_semantic_assets commands for English/multilingual as before;
-outputs assets/semantic/english and assets/semantic/multilingual automatically
-reuse assets/catalogue/ after validation. Expect encoder/tokenizer downloads,
-but no catalogue-encoding wait. Runtime still needs the query encoders. Finish
-with python scripts/finalize_tokenizers.py. --rebuild explicitly regenerates
-catalogue embeddings; mismatched/corrupt cached data otherwise fails clearly.
-The runtime also checks the matrix checksum before enabling semantic retrieval.
+Download the complete assets/semantic/ folder using the Drive link in
+instructions.md. It contains both encoders, tokenizers, catalogue matrices and
+metadata; no separate assets/catalogue/ folder is needed. Alternatively, run the
+build_semantic_assets commands in instructions.md to download the pinned
+encoders and generate vectors, then run python scripts/finalize_tokenizers.py.
+The runtime checks the catalogue digest and any matrix checksum in metadata
+before enabling semantic retrieval.
 
 Copied SapBERT tokenizers are loaded with extra_special_tokens={} to handle empty
 list metadata from newer serializers under pinned Transformers 4.57.6. This does

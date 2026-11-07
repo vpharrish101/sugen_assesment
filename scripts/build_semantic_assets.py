@@ -82,8 +82,7 @@ def main():
         parser.error("--rebuild and --precomputed cannot be combined")
 
     records = json.loads(args.catalogue.read_text(encoding="utf-8"))
-    bundled = Path(__file__).resolve().parents[1] / "assets" / "catalogue" / args.output.name
-    precomputed = args.precomputed or (bundled if bundled.exists() else None)
+    precomputed = args.precomputed
     metadata = None
     if precomputed is not None and not args.rebuild:
         metadata = load_precomputed(precomputed, records, args.model, args.revision, args.pooling, args.max_length)

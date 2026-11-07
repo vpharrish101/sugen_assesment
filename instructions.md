@@ -172,7 +172,7 @@ input dataset. The same downloaded assets work for both native Python and Docker
 
 Alternatively, prepare the query encoders and catalogue vectors once with the
 commands below. They download the pinned encoders and generate the title
-matrices, or reuse matching bundled matrices when supported by your checkout:
+matrices. Skip them if you downloaded the complete semantic assets from Drive:
 
 ```bash
 python -m scripts.build_semantic_assets \

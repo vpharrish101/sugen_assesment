@@ -11,8 +11,6 @@ ollama-experiment
 __pycache__
 **/__pycache__
 assets
-!assets/catalogue/
-!assets/catalogue/**
 BRIEF.md
 DECISIONS.md
 README.md

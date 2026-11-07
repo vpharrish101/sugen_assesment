@@ -81,3 +81,10 @@ the Drive download in instructions.md. Copied multilingual tokenizer metadata
 contained a list for extra_special_tokens, while Transformers 4.57.6 expects a
 mapping; passing an empty mapping at load time resolved the laptop smoke test.
 Use the same compatibility option for both SapBERT encoders; no ranking changes.
+
+### 2026-11-07 — Keep prepared assets in Drive
+
+Remove the redundant assets/catalogue/ matrices from the current tree. Distribute
+the complete semantic/ folder through the documented Drive link, keeping encoder
+weights and vectors Git-ignored. Docker copies that folder; native setup can also
+regenerate it. This supersedes the earlier decision to ship matrices in Git.
