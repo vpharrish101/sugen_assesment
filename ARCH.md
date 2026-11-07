@@ -1,6 +1,6 @@
 ## Architecture Decision and AI Usage
 
-**Note:** This part was completely written by me (no AI), as I wanted to walk through individual architecture designs crafted. `DECISIONS.md` has the per-commit/per-branch decisions, but this should provide the overview of core architecture designed.
+**Note:** `DECISIONS.md` has the per-commit/per-branch decisions, but this should provide the overview of core architecture designed.
 
 ### 1. Architecture Decisions
 
@@ -47,23 +47,3 @@ Following sufficient research and analysis on the task, I landed on 4 architectu
 **a.** Testing was done between Qwen3 and MedGamma, since the latter is explicitly trained on medical corpus.
 
 **a1.** However, the results were contradictory, and my initial reasoning is that Qwen is excellent as short range classification tasks, unlike MedGemma.
-
-### 3. Future improvements
-
-**a. Further comparison of general and medical models:** Qwen gave 38/60 top-1 and 49/60 top-3, while MedGemma gave 31/60 and 52/60. Qwen performed better under the scorer, but this does not establish that general models are better for medical coding. There were results published in Qwen's favour (https://papers.miccai.org/miccai-2026/paper/5540_paper.pdf), so I'd do more research here.
-
-**b. SapBERT vs PLM-ICD / LAAT:** These are supervised coding architectures, mostly evaluated on ICD-9/ICD-10 datasets, rather than direct replacements for SapBERT embeddings. Adapting them to the ICD-11 label set would require suitable training data. With only 60 labelled notes, I kept them outside the assessment scope.
-
-**c. GNN / graph-based representation:** ICD-11’s Foundation supports multiple parents, which makes graph-based retrieval worth investigating. However, the supplied MMS catalogue contains titles, chapter information and leaf/residual flags, without explicit relationships between nodes. I tried limited code-family context, but did not build a complete hierarchy or train a GNN. A further implementation should use official WHO relationships, since code prefixes alone can misrepresent the hierarchy.
-
-**d. Extended-thinking models:** The correct code was present in the top-50 candidates for 59/60 development notes, leaving room to improve the final selection. I would test whether additional reasoning improves top-1 and top-3 accuracy, particularly when choosing between specific and unspecified variants. This would need to justify its extra latency, memory or API cost.
-
-### 4. AI Usage
-
-**a.** ChatGPT Codex was used as primary prototyping agent.
-
-**b.** Architecture sketchings and design was done completely by me, as I wanted to get a deeper grasp of the problem statement and avoid superficial designs with AI.
-
-**c.** AI was used in finiding relevant research papers and GitHub implementations, reducing time required to sieve through unrelated papers.
-
-**d.** Coding was done mainly through AI, from the initial BM25 till the final architecture. I verified and reviewed the codebase of only the final draft (main branch), since allocating effort to understnad the intricate details of the prototypes seemed to be a diverting task. But to ensure that we understand what we ship, I've spent time analyzing and understanding the submitted architecture.
