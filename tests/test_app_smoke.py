@@ -83,6 +83,52 @@ class AppSmokeTests(unittest.TestCase):
         self.assertEqual(summary['routes'],{'retrieval':3})
         self.assertTrue(summary['semantic_enabled'])
 
+    def test_cli_api_priority_then_qwen_then_retrieval_with_real_http(self):
+        cert, tls = self.certificate()
+        api_replies = [
+            (200, reply(), 0),
+            (429, {'type':'error','error':{'type':'rate_limit_error','message':'simulated'}}, 0),
+            (200, reply([1, 1, 2]), 0),
+        ]
+        qwen_replies = [
+            (200, {'done_reason':'stop','message':{'content':'{"choices":[3,2,1]}'}}, 0),
+            (200, {'done_reason':'stop','message':{'content':'not JSON'}}, 0),
+        ]
+        with server(api_replies, tls) as (proxy, api_requests, _), \
+             server(qwen_replies) as (local, qwen_requests, _):
+            env = dict(self.environment, ANTHROPIC_API_KEY='test-key-never-real',
+                       HTTPS_PROXY=proxy, https_proxy=proxy, NO_PROXY='', no_proxy='',
+                       ALL_PROXY='', all_proxy='', SSL_CERT_FILE=str(cert),
+                       QWEN_BACKEND='ollama', QWEN_ENDPOINT=local)
+            summary = self.invoke(environment=env)
+        self.assertEqual(summary['routes'], {'anthropic':1,'qwen':1,'retrieval':1})
+        self.assertEqual(len(api_requests), 3)
+        self.assertEqual(len(qwen_requests), 2)
+        self.assertTrue(all(path == '/api/chat' for path, _, _ in qwen_requests))
+        self.assertTrue(all('Authorization' not in headers for _, headers, _ in qwen_requests))
+
+    def test_cli_budget_exhaustion_and_custom_model_configuration(self):
+        cert, tls = self.certificate()
+        for name, settings in (
+            ('budget', {'CODER_API_BUDGET_USD':'0.000001'}),
+            ('custom_model', {'ANTHROPIC_MODEL':'custom-test-model',
+                              'ANTHROPIC_INPUT_USD_PER_MILLION':'1',
+                              'ANTHROPIC_OUTPUT_USD_PER_MILLION':'5'}),
+        ):
+            with self.subTest(name=name), server([(200, reply(), 0)] * 3, tls) as (proxy, requests, _):
+                env = dict(self.environment, ANTHROPIC_API_KEY='test-key-never-real',
+                           HTTPS_PROXY=proxy, https_proxy=proxy, NO_PROXY='', no_proxy='',
+                           ALL_PROXY='', all_proxy='', SSL_CERT_FILE=str(cert), **settings)
+                summary = self.invoke(environment=env)
+                if name == 'budget':
+                    self.assertEqual(requests, [])
+                    self.assertEqual(summary['routes'], {'retrieval':3})
+                    self.assertEqual(summary['api_calls'], 0)
+                else:
+                    self.assertEqual(len(requests), 3)
+                    self.assertEqual(summary['routes'], {'anthropic':3})
+                    self.assertTrue(all(body['model'] == 'custom-test-model' for _, _, body in requests))
+
     def test_missing_assets_and_bad_optional_settings_still_complete(self):
         env=dict(self.environment,ANTHROPIC_API_KEY='test-key-never-real',SSL_CERT_FILE='/no/such/ca.pem',QWEN_BACKEND='typo')
         summary=self.invoke(['--semantic-assets',str(self.work/'missing'),'--timeout-seconds','0.1'],env)

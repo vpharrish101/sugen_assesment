@@ -107,7 +107,8 @@ class AnthropicWireTests(unittest.TestCase):
             self.assertEqual(headers['authorization'],'Bearer test-key-never-real')
             self.assertTrue(headers['anthropic-version'])
             self.assertEqual(body['model'],'claude-haiku-5-5')
-            self.assertEqual(body['tool_choice'],{'type':'tool','name':'rank_icd_codes'})
+            self.assertEqual(body['tool_choice'],{'type':'tool','name':'rank_icd_codes',
+                                                'disable_parallel_tool_use':True})
             self.assertEqual(body['thinking'],{'type':'disabled'})
             self.assertEqual(body['tools'][0]['input_schema']['properties']['choices']['items']['enum'],[1,2,3])
 
@@ -172,6 +173,35 @@ class AnthropicWireTests(unittest.TestCase):
                     finally:api.close()
                 self.assertEqual(connects,['api.anthropic.com:443'])
                 self.assertEqual(len(requests),1)
+
+    def test_untrusted_tls_certificate_fails_without_sending_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cert, key = Path(directory)/'cert.pem', Path(directory)/'key.pem'
+            subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1',
+                            '-keyout',str(key),'-out',str(cert),'-subj','/CN=api.anthropic.com',
+                            '-addext','subjectAltName=DNS:api.anthropic.com'],
+                           check=True,capture_output=True)
+            tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            tls.load_cert_chain(cert, key)
+            with server([(200,reply(),0)],tls) as (proxy,requests,connects):
+                real_constructor = anthropic.Anthropic
+
+                def factory(**options):
+                    # The test certificate is deliberately absent from the CA store.
+                    return real_constructor(**options, http_client=httpx2.Client(
+                        verify=ssl.create_default_context()))
+
+                environment = {'HTTPS_PROXY':proxy,'https_proxy':proxy,'NO_PROXY':'',
+                               'no_proxy':'','ALL_PROXY':'','all_proxy':''}
+                with patch.dict(os.environ,environment),patch('anthropic.Anthropic',side_effect=factory):
+                    api = AnthropicReranker('test-key-never-real','claude-haiku-5-5',2)
+                    try:
+                        with self.assertRaises(anthropic.APIConnectionError):
+                            self.rank(api)
+                    finally:
+                        api.close()
+                self.assertEqual(connects,['api.anthropic.com:443'])
+                self.assertEqual(requests, [])
 
 
 @unittest.skipUnless((os.getenv('CODER_TEST_ASSETS') and os.getenv('CODER_TEST_NOTES')),'set CODER_TEST_ASSETS for the three-note integration check')

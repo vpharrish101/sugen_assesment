@@ -123,7 +123,8 @@ class AnthropicSDKTests(unittest.TestCase):
         payload = json.loads(request.content)
         self.assertEqual(str(request.url), 'https://api.anthropic.com/v1/messages')
         self.assertEqual(payload['model'], 'claude-haiku-5-5')
-        self.assertEqual(payload['tool_choice'], {'type':'tool','name':'rank_icd_codes'})
+        self.assertEqual(payload['tool_choice'], {'type':'tool','name':'rank_icd_codes',
+                                                'disable_parallel_tool_use':True})
         self.assertEqual(payload['max_tokens'], 256)
         self.assertEqual(api.calls, 1)
         self.assertGreater(api.reserved_usd, 0)

@@ -39,3 +39,62 @@ See the local cleanup verification record for the newly cleaned images. The imag
 Successful simulation establishes tested application behavior, not real account authorization or provider-side model availability. Missing/corrupt mandatory catalogue data, invalid input/configuration, an unwritable output volume, or an OS/container kill are operational failures that cannot be repaired by an API fallback. The app reports ordinary file/configuration errors; deploy with the tested image, valid input and a writable output mount. Clinical accuracy is independent of these reliability checks.
 
 Final Docker outcome: build passed; `pip check` passed; CPU Torch 2.9.1+cpu and Anthropic SDK 2.6.0 verified; image source equals the tested working tree; no dev gold/archived experiments included. Compose forwards key/model and both proxy-variable cases, enforces four CPUs/6 GiB, and the exact entrypoint produced all three valid predictions offline in **7.1874 seconds**, at **1,475.9 MiB** peak RSS. Four app CLI smoke methods passed again using the rebuilt image's own code, including the unpatched SDK HTTPS success/failure paths and clear invalid-input handling. The live-key helper correctly exited 2 with no key and no requests. No live provider access or model quality is claimed. The smoke-tested changes are included on the `final-prototype` branch.
+
+## 2026-11-07 — Review of main, with no live key
+
+Reviewed main at `0602417` and ran the current working tree in the cached CPU
+runtime. The user had already verified the Docker build and Qwen path; neither
+was changed or rebuilt for this review. Current source and tests were mounted
+into the runtime, which had external networking disabled. Only the same three
+existing clinical inputs were reused across real-encoder checks; other tests
+use small protocol fixtures, not a new clinical dataset.
+
+The final discovery run took **93.533 seconds**: **79 passed, one skipped**.
+The skipped source-checkout privacy test needs Git, absent from the runtime; it
+passed separately on the host. There were no failures. `pip check` passed with
+Torch 2.9.1+cpu, Transformers 4.57.6, NumPy 2.3.5, Anthropic 2.6.0, httpx2 2.16.0,
+langid 1.1.6 and abbreviations 0.2.5 available. Existing cached dependencies were
+used; no models or packages were downloaded during the review.
+
+The added checks cover:
+
+- API-first configuration, explicit Ollama bypass, custom model/price settings,
+  missing credentials and invalid budgets or prices.
+- Actual SDK authentication, API version, system/user separation, forced-tool
+  schema, candidate limits of 3/50/100, deadlines and independent requests.
+- HTTP 400/401/402/403/404/408/409/413/422/429/500/502/503/529; timeouts, dropped
+  connections, no hidden retries, budget accounting and consecutive failures.
+- Invalid JSON/tool inputs, floats, booleans, strings, duplicates, out-of-range
+  choices, refused/unfinished turns and output truncation.
+- Successful HTTPS through a local CONNECT proxy and rejection of an untrusted
+  certificate before the HTTP request and credentials are sent.
+- Real CLI runs through API success, Qwen fallback and retrieval fallback,
+  preserving IDs and valid catalogue codes. These CLI checks use the actual SDK
+  and HTTP transport without replacing the SDK or production base URL.
+- Ignoring gold labels in API input, rejecting invalid input before truncating
+  an existing output file, and evaluating protocol predictions with score.py.
+
+Two gaps were reproduced and corrected in the Anthropic adapter: request exactly
+one tool call with `disable_parallel_tool_use=True`, and require `tool_use` as
+the completed stop reason. A refusal or paused/incomplete turn must fall back,
+even if a malformed response also contains a tool-shaped block. The shared
+prompt, retrieval, Qwen settings and Docker/Compose files are unchanged.
+
+Additional checks validated the emitted tool schema with JSON Schema, resolved
+both Compose configurations to verify key/model forwarding and data mounts,
+and confirmed the opt-in live helper exits 2 with no key instead of reporting
+fallback as API success. The configured default model is listed in the pinned
+SDK's model type; that does not establish account access to it.
+
+To repeat the tests after installing the declared dependencies:
+
+```sh
+CODER_TEST_ASSETS="$PWD/assets/semantic" \
+CODER_TEST_NOTES=/path/to/private/three-notes.jsonl \
+PYTHONPATH=src:tests python -m unittest discover -s tests -v
+```
+
+The local API/proxy never forwards to Anthropic. No paid request was made.
+Real authentication, credit, model permissions, provider-side acceptance,
+latency and clinical accuracy remain unverified until the one-note live smoke
+is run with a real key.

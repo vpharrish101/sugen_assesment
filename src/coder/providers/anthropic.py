@@ -38,10 +38,13 @@ class AnthropicReranker:
                         'choices': {'type': 'array', 'items': {'type': 'integer', 'enum': list(range(1, len(candidates) + 1))},
                                     'minItems': 3, 'maxItems': 3}},
                         'required': ['choices'], 'additionalProperties': False}}],
-            tool_choice={'type': 'tool', 'name': 'rank_icd_codes'},
+            tool_choice={'type': 'tool', 'name': 'rank_icd_codes',
+                         'disable_parallel_tool_use': True},
         )
         if result.stop_reason == 'max_tokens':
             raise ValueError('API output exhausted its token budget')
+        if result.stop_reason != 'tool_use':
+            raise ValueError(f'API did not complete the ranking tool: {result.stop_reason}')
         blocks = [block for block in result.content if block.type == 'tool_use' and block.name == 'rank_icd_codes']
         if len(blocks) != 1:
             raise ValueError('API did not return the requested ranking tool')
