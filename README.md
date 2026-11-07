@@ -2,6 +2,8 @@
 
 BM25 + English and multilingual SapBERT retrieval, followed by LLM reranking. The final version uses Claude as the primary API path, optional local Qwen as a fallback, and retrieval-only output if neither is available.
 
+Note: Please refer to ARCH.md, for architecture details.
+
 ## Run and evaluate
 
 ```sh
@@ -57,4 +59,4 @@ c. Retrieval recall@50: Around 85%, meaning the correct code appears somewhere i
 
 Hours spent: approximately 23 hours.
 
-The figures in note 4 are hidden-set estimates, not measured results. Recall@50 does not directly contribute to the assessment score. The Qwen 8B observations in note 1 are the author's account; no quantitative 8B benchmark is included above.
+The figures in note 4 are hidden-set estimates, not measured results. Recall@50 does not directly contribute to the assessment score.
