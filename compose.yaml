@@ -4,11 +4,13 @@ services:
       context: .
       secrets:
         - system_ca
-    network_mode: none
+    environment:
+      QWEN_MODEL: ${QWEN_MODEL:-hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M}
+      QWEN_ENDPOINT: ${QWEN_ENDPOINT:-http://127.0.0.1:11434}
     cpus: ${CODER_CPUS:-4}
     mem_limit: ${CODER_MEMORY:-6g}
     volumes:
-      - ${CODER_INPUT_DIR:-./data}:/in:ro
+      - ${CODER_INPUT_DIR:-./private-data}:/in:ro
       - ${CODER_OUTPUT_DIR:-./out}:/out
 
 secrets:

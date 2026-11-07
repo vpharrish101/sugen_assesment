@@ -2,8 +2,8 @@
 
 import json
 
-from hierarchy_reranker import make_payload as hierarchy_payload
-from run_ollama_experiment import make_messages
+from .hierarchy_reranker import make_payload as hierarchy_payload
+from .prompt import make_messages
 
 
 def first_pass_payload(row, model):

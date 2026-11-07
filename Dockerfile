@@ -56,4 +56,5 @@ COPY scripts/finalize_tokenizers.py scripts/finalize_tokenizers.py
 RUN python scripts/finalize_tokenizers.py
 
 COPY coder/ coder/
-ENTRYPOINT ["python", "-m", "coder"]
+COPY prototype/ prototype/
+ENTRYPOINT ["python", "-m", "prototype"]

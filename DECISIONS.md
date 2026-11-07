@@ -103,3 +103,7 @@ Decision: show opaque selection IDs and catalogue titles/relationships to Qwen, 
 Commit: `Add focused two-pass Qwen verifier`, on `qwen-two-pass-prototype`.
 
 Decision: preserve the original first-pass Qwen request, then verify its three choices against a bounded 24-candidate shortlist of retrieval alternatives and nearby catalogue variants. Support saved original-Qwen predictions to isolate the verifier's effect. Alternatives: promote the single-pass hierarchy v2 result or change the model. Evidence from the laptop: single-pass v2 reached 38/60 top-one, 43/60 top-three, 49.58/75, zero formatting fallbacks and 55 valid excerpts in 86.2 seconds, versus the original 38/49 and 52.08/75. The new runner keeps the first-pass ranking if the verifier returns invalid choices or an invalid literal excerpt; a valid verifier can still change all three codes and must be evaluated for regressions. Tests cover exact first-request equivalence, focused family expansion, two-call and cached-call counts, fallback behavior and resume. Revisit only after a complete paired 60-note comparison; no full two-pass score is available yet.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.
