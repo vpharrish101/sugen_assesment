@@ -97,3 +97,7 @@ Decision: preserve the measured Qwen model and frozen 50-candidate retrieval poo
 Commit: `Use opaque selection IDs in hierarchy prompt`, on `qwen-hierarchy-prototype`.
 
 Decision: show opaque selection IDs and catalogue titles/relationships to Qwen, keep the ICD mapping in Python, and require quoted IDs in the response. Alternative: repair malformed JSON containing a mix of bare codes and indices. Evidence: the supplied 60-note version 1 laptop trace matches the committed prompt and contains 19 such JSON failures; retrieval fallbacks result in 36/60 top-one and 47/60 top-three (49.58/75). Of 14 additional evidence flags, nine quotes exceeded the length budget and five were not literal excerpts. Version 2 asks for one contiguous phrase of at most 120 characters and uses a fresh experiment identifier to prevent mixed-run resume. The one-call ranking architecture and candidate expansion are unchanged. Revisit accuracy only after a complete version 2 run.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.
