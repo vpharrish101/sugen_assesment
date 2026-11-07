@@ -37,19 +37,10 @@ class OutputContractTests(unittest.TestCase):
             with self.subTest(choices=choices), self.assertRaises(ValueError):
                 parse_choices(json.dumps({'choices': choices}), ['A', 'B', 'C'])
 
-    def test_prompt_is_identical_to_measured_qwen_prompt(self):
-        import importlib.util
-        root = Path(__file__).resolve().parents[1]
-        spec = importlib.util.spec_from_file_location('old_prompt', root / 'experiments/ollama/test_local_reranker.py')
-        old = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(old)
-        row = json.loads((root / 'experiments/ollama/candidates.jsonl').read_text().splitlines()[0])
-        expected = old.make_messages(row)
-        expected[0]['content'] = expected[0]['content'].split('First write one short sentence')[0] + (
-            'Return only a JSON object in exactly this shape: {"choices":[1,2,3]}. Replace the numbers with three distinct candidate numbers, best first. No explanation or markdown.')
-        codes = [r['code'] for r in row['candidates']]
-        titles = {r['code']: r['title'] for r in row['candidates']}
-        self.assertEqual(make_messages(row['text'], codes, titles), expected)
+    def test_measured_system_prompt_is_preserved(self):
+        import hashlib
+        from coder.prompt import SYSTEM
+        self.assertEqual(hashlib.sha256(SYSTEM.encode()).hexdigest(), 'ba9ade57a1bc39b064aebc8bcea3b1944776ae2fc7a731b20736246401a41e27')
 
     def test_api_first_then_qwen_then_retrieval(self):
         with patch.dict(os.environ, {}, clear=True):

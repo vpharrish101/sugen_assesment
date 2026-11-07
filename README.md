@@ -1,27 +1,35 @@
 # ICD-11 clinical note coder
 
-Fresh note → diagnosis-focused retrieval → Anthropic Haiku 5.5 → local Qwen if configured → validated retrieval fallback. English keeps the measured SapBERT mixture and BM25 candidate pool. Non-English notes use multilingual SapBERT; Spanish/Chinese have a small structural extraction addon. Providers see the full note and numbered catalogue titles. Only supplied catalogue codes can be output; there is no training on dev labels.
+Fresh note → diagnosis-focused BM25/SapBERT retrieval → Claude reranking → optional local Qwen → retrieval fallback. Only supplied catalogue codes can be returned. English keeps the measured embedding mixture; other languages use multilingual SapBERT.
+
+## Run
+
+Put your private `notes.jsonl` and evaluation labels in the Git-ignored `private-data/` directory, or set CODER_INPUT_DIR. No clinical dataset is shipped. Only the public ICD-11 catalogue is tracked.
 
 ```sh
-docker compose build
+mkdir -p private-data out
+docker compose build coder
 docker compose run coder /in/notes.jsonl /out/predictions.jsonl
-python score.py --gold data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
+python score.py --gold private-data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
 ```
 
-Inputs mount from `./data`, outputs to `./out`. Set `ANTHROPIC_API_KEY`; Compose forwards the grader's `HTTPS_PROXY`. See [.env.example](.env.example) and [running instructions](docs/RUNNING.md). Without a key/local server every note still gets an offline prediction. Encoders and title indexes are built into the CPU image. Runtime never downloads assets. Default limits: 4 CPUs/6 GB, 3,300 seconds of inference, $5.50 conservative API reservation, at most $6 configured. Predictions flush per note.
+Set ANTHROPIC_API_KEY in .env for Claude; HTTPS_PROXY is forwarded. No-key fallback produces predictions for every valid input. For local Ollama use compose.qwen.yaml; see docs/RUNNING.md. The image builds catalogue title indexes ahead of time and never downloads models at runtime. Defaults: four CPUs/6 GiB, 3,300s inference budget and $5.50 conservative API reservation, configurable up to $6. Predictions flush per note. Optional service failures fall back with redacted diagnostics.
 
-| Measured dev system | Top-1 | Top-3 | Official-score equivalent |
+## Recorded development results
+
+| Approach | Top-1 | Top-3 | Score /75 |
 |---|---:|---:|---:|
-| Focused BM25 | 14/60 | 23/60 | 21.25/75 |
-| Offline SapBERT mixture | 27/60 | 44/60 | 40.83/75 |
-| Local Qwen3 **4B** GPU prototype | 38/60 | 49/60 | 52.08/75 |
+| BM25 | 5/60 | 9/60 | 7.92 |
+| Enhanced BM25 | 14/60 | 23/60 | 21.25 |
+| Hybrid SapBERT | 27/60 | 44/60 | 40.83 |
+| Original local Qwen 4B | 38/60 | 49/60 | 52.08 |
+| Single-pass hierarchy v2 | 38/60 | 43/60 | 49.58 |
+| Two-pass hierarchy v1 | 37/60 | 54/60 | 53.33 |
 
-The historical branch name `qwen3b-prototype` refers to that 4B model. Haiku API accuracy has not yet been measured; the Qwen result cannot be attributed to Haiku. Provisional hidden estimate: **40–55/100**, low confidence given narrow dev coverage and weak non-English results.
+The two-pass run's fresh first pass also scored 53.33/75 (39/60, 50/60). Claude has no live accuracy result. These are historical development measurements, not new smoke scores. Hidden estimates are uncertain: top-1 55–60%, top-3 about 65%, candidate recall@50 about 85%. Recall@50 is not directly scored.
 
-Added data: pinned public English/multilingual [SapBERT](https://github.com/cambridgeltl/SapBERT) weights (UMLS entity linking), build-generated title vectors, and reviewed assistant translations of six existing cases into Spanish/Chinese. No new clinical cases or labelled training set were invented. No WHO definitions were added. Models/provenance and all controlled results are documented in [multilingual evaluation](docs/MULTILINGUAL_RETRIEVAL.md).
+Added resources: pinned public English/multilingual SapBERT encoders from https://github.com/cambridgeltl/SapBERT and build-generated catalogue embeddings. Earlier Spanish/Chinese translations of six supplied cases were limited diagnostics, not independent clinical validation or training data. All clinical originals/derivatives and note-level reports are removed from Git history in the cleanup draft. Aggregate scores remain.
 
-Validation: 51 checks passed, plus rebuilt-image CLI and Compose smoke checks using three clinical inputs. New smoke: 7.2 seconds, 1.44 GiB RAM, no missing/invalid predictions. Earlier retrieval validation preserved all 60 candidate lists. Beyond dev: 18 paired-language fixtures and SDK/proxy/budget/outage checks. Translations are not independent clinical validation; their extraction path gives Spanish 2/6 top-1, 3/6 top-3 and Chinese 0/6, 2/6. Current reliability evidence: [API/Docker smoke](docs/API_TESTING.md); remaining submission items: [brief audit](docs/BRIEF_CHECK.md).
+Software validation uses small protocol fixtures and at most three externally supplied notes, including SDK/HTTP/TLS, proxy, timeout, malformed-output, fallback and Docker checks. No paid API calls or large clinical benchmark is needed for smoke testing. AI tooling initially suggested a larger Qwen would necessarily improve accuracy; the author reports limited benefit in local comparisons, with extra latency. No quantitative 8B result is claimed here.
 
-AI error caught: early research called `1F51.Z` chickenpox; the supplied catalogue identifies it as African trypanosomiasis. Catalogue validation and title-constrained selection replaced free code guessing. A final SDK test also caught an unsupported `temperature` argument before deployment.
-
-Hours spent: **TODO: enter your actual total before submitting**. History is preserved; decisions are in [DECISIONS.md](DECISIONS.md). Bundle creation and email submission are deferred at your request.
+Hours spent: approximately 23 (4 + 7 + 12), per the author's accounting. Architecture decisions/history remain in DECISIONS.md. Privacy cleanup rewrites historical commit IDs; do not push from an old unsanitized clone after the approved replacement.

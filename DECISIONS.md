@@ -135,3 +135,7 @@ Commit: `Harden optional services and verify complete Docker smoke`. Decision: t
 Commit: `Add optional host networking override for local Qwen`.
 
 Decision requested by user: commit `compose.qwen.yaml` on the final branch. The override changes only network_mode to host; provider/model/key settings remain in the base Compose file and .env. Alternatives: alter the default grading network or permit non-loopback Qwen endpoints. Evidence: the current local client deliberately accepts loopback only; merged Compose configuration is checked for host networking and preserved environment/model settings. No model inference or live host Ollama connectivity is claimed in this configuration-only check. Revisit bridge networking only if needed on another Docker platform.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.

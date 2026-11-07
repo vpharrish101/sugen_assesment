@@ -22,7 +22,7 @@ services:
     cpus: ${CODER_CPUS:-4}
     mem_limit: ${CODER_MEMORY:-6g}
     volumes:
-      - ${CODER_INPUT_DIR:-./data}:/in:ro
+      - ${CODER_INPUT_DIR:-./private-data}:/in:ro
       - ${CODER_OUTPUT_DIR:-./out}:/out
 
 secrets:
