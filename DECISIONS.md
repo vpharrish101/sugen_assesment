@@ -49,3 +49,7 @@ Decision: detect generic assessment/diagnosis cues and search their trailing tex
 Commit: `Add diagnosis-focused family retrieval`.
 
 Decision: preserve the top 25 focused results, add up to 10 new full-note results, then round-robin actual members of at most five dot-prefix families until 50 candidates. Alternatives: infer a WHO graph, expand all prefix matches, or use focused results alone. Evidence: every dotted code in the supplied catalogue has its root present, while official parent edges are absent. The bounded pool raises exact gold recall@50 from the control's 31/60 to 40/60 and recall@25 to 38/60. Family expansion never fabricates codes and begins after the top 25, so clinical ranking remains a separate future step. These pool sizes were selected after a small dev comparison and therefore require validation beyond dev. Revisit once a semantic retriever and constrained reranker exist.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.

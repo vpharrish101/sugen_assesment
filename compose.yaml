@@ -5,5 +5,5 @@ services:
     cpus: ${CODER_CPUS:-1}
     mem_limit: ${CODER_MEMORY:-1g}
     volumes:
-      - ${CODER_INPUT_DIR:-./data}:/in:ro
+      - ${CODER_INPUT_DIR:-./private-data}:/in:ro
       - ${CODER_OUTPUT_DIR:-./out}:/out
