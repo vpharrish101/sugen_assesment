@@ -39,6 +39,26 @@ Pretrained encoders came from [SapBERT](https://github.com/cambridgeltl/SapBERT)
 
 51 software checks passed, plus rebuilt-image CLI and Docker Compose smoke checks using three clinical inputs. These cover proxy/TLS handling, provider errors, timeouts, malformed responses and fallbacks. Simulated API responses test integration, not Claude's clinical accuracy. Details are in `docs/API_TESTING.md`; recorded results are under `reports/`. Decisions and experiment history are in `DECISIONS.md`.
 
+## Future improvements
+
+**a. Further comparison of general and medical models:** Qwen gave 38/60 top-1 and 49/60 top-3, while MedGemma gave 31/60 and 52/60. Qwen performed better under the scorer, but this does not establish that general models are better for medical coding. There were results published in Qwen's favour (https://papers.miccai.org/miccai-2026/paper/5540_paper.pdf), so I'd do more research here.
+
+**b. SapBERT vs PLM-ICD / LAAT:** These are supervised coding architectures, mostly evaluated on ICD-9/ICD-10 datasets, rather than direct replacements for SapBERT embeddings. Adapting them to the ICD-11 label set would require suitable training data. With only 60 labelled notes, I kept them outside the assessment scope.
+
+**c. GNN / graph-based representation:** ICD-11’s Foundation supports multiple parents, which makes graph-based retrieval worth investigating. However, the supplied MMS catalogue contains titles, chapter information and leaf/residual flags, without explicit relationships between nodes. I tried limited code-family context, but did not build a complete hierarchy or train a GNN. A further implementation should use official WHO relationships, since code prefixes alone can misrepresent the hierarchy.
+
+**d. Extended-thinking models:** The correct code was present in the top-50 candidates for 59/60 development notes, leaving room to improve the final selection. I would test whether additional reasoning improves top-1 and top-3 accuracy, particularly when choosing between specific and unspecified variants. This would need to justify its extra latency, memory or API cost.
+
+## AI Usage
+
+**a.** ChatGPT Codex was used as primary prototyping agent.
+
+**b.** Architecture sketchings and design was done completely by me, as I wanted to get a deeper grasp of the problem statement and avoid superficial designs with AI.
+
+**c.** AI was used in finiding relevant research papers and GitHub implementations, reducing time required to sieve through unrelated papers.
+
+**d.** Coding was done mainly through AI, from the initial BM25 till the final architecture. I verified and reviewed the codebase of only the final draft (main branch), since allocating effort to understnad the intricate details of the prototypes seemed to be a diverting task. But to ensure that we understand what we ship, I've spent time analyzing and understanding the submitted architecture.
+
 ## Notes
 
 1. One place my ai tooling was wrong, is that: increasing parameter model (while testing, qwen 3-4b to qwen 3-8b without thinking) would increase the accuracy materially. But since my idea was that, it wouldn't produce meaningful results as this task is a constrained code classification, a 4B param model handles most of it well and an 8b would do little to accuracy but at the cost of 2x the latency. the results proved my side when we tested with both qwen 3-4b and 8b. I delibrately left thinking out, since it added a heavy constraint on my GPU, taking upwards of 140s for a single query in my RTX4060.
