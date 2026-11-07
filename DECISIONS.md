@@ -1,141 +1,70 @@
 # Decisions
 
-Commit references use unique commit subjects to avoid circular self-hashes; resolve them with `git log --oneline`. Times are UTC (+05:30 for India).
+## Branch → architecture
 
-## 2026-11-05 13:22 UTC — Title-only control
+| Branch | Architecture / purpose |
+|---|---|
+| `main` | Cleaned final API-first application |
+| `final-prototype` | Final BM25/SapBERT → Claude → optional Qwen → retrieval fallback |
+| `bm25` | Full-note BM25 baseline |
+| `bm25-enhanced` | Diagnosis-focused BM25 and bounded family candidates |
+| `sapbert` | English/multilingual SapBERT hybrid retrieval |
+| `qwen3b-prototype` | Basic single-call Qwen3 **4B** reranking; branch name is historical |
+| `qwen-hierarchy-prototype` | One-call hierarchy-aware Qwen reranking |
+| `qwen-two-pass-prototype` | Initial Qwen ranking followed by hierarchy verification |
+| `tmp/ollama-rerank-download` | Archived delivery branch; no active Docker runtime |
 
-Commit: `Implement title-only BM25 baseline`.
+## Unified log
 
-Decision: implement standard BM25 (k1=1.5, b=0.75) using an inverted index and the Python standard library. Alternatives: a third-party BM25 package, TF-IDF, or starting with embeddings/LLM ranking. Evidence: only 18,375 short documents; an inverted index avoids scanning every title for each note and requires no dependency downloads. Query terms count once; tokenization is Unicode-aware case folding without aliases, stemming, or hand-built medical rules. Ties use code order. These are defaults, not choices tuned against gold labels. Revisit retrieval only after recording this control's actual results.
+Consolidated from the existing branch logs; original entries remain in history.
+Dates below identify the associated implementation commits in IST. Laptop results
+reported afterward are identified as such. Counts are top-1/top-3 out of 60 unless
+another denominator is given. Commit IDs refer to the locally sanitized history.
 
-## 2026-11-05 13:22 UTC — Grading contract and failure visibility
+### 2026-11-05 18:58 IST — BM25 baseline
 
-Commit: `Implement title-only BM25 baseline`.
+Commit: `2366f83`. Use full-note title matching as the control, rather than start with an LLM. It scored 5/60 top-1 and 9/60 top-3 (7.92/75). Keep catalogue validation and one output per ID; improve retrieval next.
 
-Decision: the runner consumes id/text only, writes one final line per unique input ID, and flushes each record. It validates code membership/uniqueness and rejects duplicate input IDs or input/output path collisions. Zero-overlap queries return deterministic zero-score catalogue entries, explicitly tracked in stderr; these provide coverage but no meaningful diagnosis. Alternatives: omit uncertain notes or emit provisional corrections. Evidence: missing notes score zero and the official scorer keeps the first duplicate prediction. Revisit the weak zero-overlap path when semantic retrieval is added.
+### 2026-11-05 19:18 IST — Enhanced BM25
 
-## 2026-11-05 13:22 UTC — Offline container
+Commit: `1a4c4ed`. Search the clinician assessment before the full note and add bounded catalogue-family candidates. This improved results to 14/60 and 23/60 (21.25/75); the recorded family pool reached 40/60 recall@50. Prefix families are retrieval hints, not official WHO edges.
 
-Commit: `Implement title-only BM25 baseline`.
+### 2026-11-06 11:43 IST — Hybrid SapBERT
 
-Decision: ship only the runner and supplied code catalogue in a digest-pinned Python 3.12 container; exclude dev gold and scorer from the image. Disable container networking and default to 1 CPU/1 GB (overridable with CODER_CPUS/CODER_MEMORY). Alternatives: install libraries during startup or bake dev labels into the image. Evidence: runtime permits only model APIs and requires CPU-only no-key operation. Initial image build passed, but Docker rejected an explicit 8-CPU limit because this managed daemon exposes only 5 CPUs. The single-process baseline needs no 8-CPU allocation; lower limits also provide a stricter performance check than grading. The baseline uses no model calls or secrets. Revisit network configuration when model-API ranking is implemented.
+Commit: `9a197e9`. Choose biomedical synonym embeddings over a general encoder. English SapBERT reached 26/42 versus MiniLM 16/28; the English/multilingual mixture reached 27/44 (40.83/75). SapBERT + BM25 candidates covered 59/60 at 50. Validate these choices on independent notes later.
 
-## 2026-11-05 13:27 UTC — Freeze the first measured control
+### 2026-11-06 16:11 IST — Qwen versus MedGemma
 
-Commit: `Implement title-only BM25 baseline`.
+Commit: `f16b670`. Keep Qwen3 4B after laptop results of 38/49 (52.08/75), versus MedGemma 31/52 (47.50/75). Medical pretraining did not win under this scorer. These are development results, not evidence that Qwen is universally better.
 
-Decision: record the raw-title baseline without tuning against dev gold. Alternatives: immediately add stopwords, favour leaf/residual categories, or adjust query sections to improve the score. Evidence: official scorer reports 5/60 top-1, 9/60 top-3, 7.9/75, zero missing/invalid/duplicate predictions; recall@25 is 26/60 and recall@50 is 31/60. Five unit/CLI tests passed. Full-note matching can rank hypothetical fever or background symptoms ahead of the encounter diagnosis, confirming a limitation rather than a runtime failure. The network-disabled Docker run matched the dev contract and processed 600 repeated-dev notes with new IDs in 2.24 seconds under 1 CPU/1 GB; this is a throughput check, not generalisation evidence. Revisit search coverage and clinical interpretation as separate measured changes.
+### 2026-11-06 16:24 IST — Bound local inference memory
 
-## 2026-11-05 13:29 UTC — Include the official evaluation artifact
+Commit: `74b30e8`. Disable llama-server RAM prompt caching and idle-slot caching instead of relying on Python garbage collection. A short CPU probe showed stable memory. This bounds prompt caching, not total process RAM; Ollama manages its own server memory.
 
-Commit: `Include official scorer for reproducible evaluation`.
+### 2026-11-06 17:30 IST — Single-pass hierarchy experiment
 
-Decision: track the supplied scorer byte-for-byte, outside the runtime image. Evidence: the first explicit staging list omitted score.py even though local evaluation used it; clean-clone review caught the omission. Alternative: document downloading the scorer separately, which would weaken reproduction. Revisit only if the assessment provides a new scorer.
+Commit: `a51a096`. Add bounded catalogue relatives and use opaque selection IDs instead of mixed codes/numbers. The later laptop run scored 38/43 (49.58/75), below basic Qwen. Keep this as an experimental branch; expanded-pool recall@50 was not separately recorded.
 
-## 2026-11-05 13:29 UTC — Clean-clone reproduction passed
+### 2026-11-06 17:45 IST — Two-pass verifier
 
-Commit: `Record baseline validation and clean-clone results`.
+Commit: `fee1612`. Check the first ranking against a 24-candidate family shortlist, retaining the first pass on invalid verification. Later laptop results: 39/50 before verification, 37/54 after; both scored 53.33/75. Better top-3 did not justify a score gain or twice the calls.
 
-Decision: accept source commit f3de75a as the first working control. Evidence: cloned with `git clone --no-local` into /tmp/su-baseline-check; a no-cache Docker build and the exact `docker compose run coder /in/notes.jsonl /out/predictions.jsonl` command passed with network disabled, 1 CPU/1 GB, and no model keys required. The clean-clone scorer reproduced 7.9/75 with no missing/invalid/duplicate predictions, candidate recall reproduced 26/60 at 25 and 31/60 at 50, and all five tests passed from the clone. Native and Docker predictions were byte-identical. The 600-note repeated-dev workload had 600 unique expected IDs and valid distinct codes; it establishes throughput, not clinical generalisation. Original scorer, catalogue, and gold files were byte-compared against the uploads. Alternative: proceed using only current-directory checks, rejected because the brief explicitly requires fresh-clone reproducibility. Revisit these checks when dependencies or the pipeline change.
+### 2026-11-06 22:05 IST — Multilingual addon
 
-## 2026-11-05 14:05 UTC — Focus lexical search on documented assessment
+Commit: `032ba4d`. Preserve the measured English mixture; use multilingual retrieval with Spanish/Chinese assessment cues and note-local abbreviation expansion. On six paired cases per language, Spanish reached 2/3 and Chinese 0/2. These were limited diagnostics, not independent clinical validation.
 
-Commit: `Add diagnosis-focused family retrieval`.
+### 2026-11-06 22:05 IST — CPU grading and API-first routing
 
-Decision: detect generic assessment/diagnosis cues and search their trailing text; fall back to the full note when no cue or lexical overlap exists. Alternatives: keep full-note BM25, add disease-specific aliases, or call an LLM immediately. Evidence: the frozen control often ranked symptoms, precautions, and background conditions. The focused strategy improved top-1 from 5/60 to 14/60 and top-3 from 9/60 to 23/60, raising the official dev score from 7.9 to 21.2/75. It added 14 top-3 hits without losing any, while top-1 gained 10 and lost one. Rules contain no disease names, code prefixes, note IDs, or gold labels. Revisit cue precision on independent note styles.
+Commit: `032ba4d`. Use Claude first, configured local Qwen second, retrieval last. Keep a $5.50 conservative API reservation and 3,300-second inference budget. The grader has no GPU; no key must still yield predictions. Real Claude access and accuracy remain untested.
 
-## 2026-11-05 14:05 UTC — Create a bounded catalogue-family candidate pool
+### 2026-11-06 23:17 IST — Failure handling and small smoke tests
 
-Commit: `Add diagnosis-focused family retrieval`.
+Commit: `3349164`. Keep predictions when providers time out, reject requests or return invalid rankings. Three consecutive provider failures disable that provider. SDK/socket/TLS and three-note CLI checks passed without paid calls. Later cleanup checks also cover setup/cleanup errors and incomplete retrieval batches.
 
-Decision: preserve the top 25 focused results, add up to 10 new full-note results, then round-robin actual members of at most five dot-prefix families until 50 candidates. Alternatives: infer a WHO graph, expand all prefix matches, or use focused results alone. Evidence: every dotted code in the supplied catalogue has its root present, while official parent edges are absent. The bounded pool raises exact gold recall@50 from the control's 31/60 to 40/60 and recall@25 to 38/60. Family expansion never fabricates codes and begins after the top 25, so clinical ranking remains a separate future step. These pool sizes were selected after a small dev comparison and therefore require validation beyond dev. Revisit once a semantic retriever and constrained reranker exist.
+### 2026-11-06 23:39 IST — Optional Docker host networking
 
-## 2026-11-05 14:06 UTC — Prepare ontology-encoder evaluation before choosing a checkpoint
+Commit: `50ae4ca`. Add compose.qwen.yaml for reaching host Ollama through loopback. Keep it optional for API-only grading and keep model/key settings in .env. With both providers configured, automatic routing remains Claude first; --backend ollama explicitly bypasses Claude.
 
-Commit: `Prepare biomedical dense retrieval benchmark`.
+### 2026-11-07 08:09 IST — Private data and branch cleanup
 
-Decision: build a frozen local dense-index path around a pinned encoder, precomputed normalized title vectors, catalogue hashes, and reciprocal-rank fusion, while leaving the measured focused strategy as the runtime default until checkpoints are compared. Shortlist English SapBERT and multilingual SapBERT-XLMR; use a character TF-IDF control, and reject BioBERT alone because masked-language pretraining does not directly train synonym retrieval. Evidence: the 20 recall@50 misses are dominated by aliases and abbreviations such as “jiggers”/“tungiasis”, “vaginal thrush”/“vulvovaginal candidosis”, and “GORD”/“gastro-oesophageal reflux disease”. The official SapBERT repository documents UMLS synonym-pair entity-linking training, CLS pooling, cross-lingual variants, and an MIT license. A local character 3–5 gram control reached 42/60 recall@50 but reduced top-1 from 14 to 13 when fused into final ranking, so it is insufficient as the semantic stage. Also exclude patient turns and negated cue tails from assessment extraction; this preserved 14/60 top-1 and 23/60 top-3 while raising the existing family pool to 41/60 recall@50. Model artifact access is pending activation of the saved Hugging Face CDN policy. Revisit model and fusion defaults only after real checkpoint measurements under the CPU deployment constraint.
-
-## 2026-11-05 15:21 UTC — Select SapBERT CLS after checkpoint controls
-
-Commit: `Add hybrid SapBERT retrieval`.
-
-Decision: use pinned `cambridgeltl/SapBERT-from-PubMedBERT-fulltext` revision `090663c…` with the documented CLS-before-pooler representation. Alternatives: focused BM25, general `all-MiniLM-L6-v2`, official mean-token SapBERT, BioLORD, or a generative LLM. Evidence on the frozen 60 notes: English SapBERT reached 26/60 top-1, 42/60 top-3, and 54/60 recall@50; MiniLM reached 16/28/39 and mean-token SapBERT 24/38/53. BioLORD was not downloaded because its model card declares a nonstandard `other` license and the purpose-built SapBERT result already met the entity-linking need. Pure English dense ranking beat lexical+dense fusion for final top-three, while equal English-dense/BM25 fusion reached 59/60 recall@50 for a future verifier. Revisit with an independent labelled ICD set and a constrained verifier.
-
-## 2026-11-05 15:21 UTC — Keep a lower-weight multilingual encoder
-
-Commit: `Add hybrid SapBERT retrieval`.
-
-Decision: ship pinned multilingual SapBERT-XLMR revision `47b6bd0…`, route with offline `langid`, and fuse English:multilingual at 3:1 for English notes and 1:3 otherwise using RRF constant 10. Alternatives: English only, multilingual only, equal fusion, or an API translation step. Evidence: multilingual-only English performance was 19/60 top-1, 28/60 top-3, and 45/60 recall@50, so it cannot replace English SapBERT. The 3:1 ensemble improved the measured final result to 27/60 top-1 and 44/60 top-3 (40.8/75); all 60 dev notes were classified as English. The brief explicitly warns that hidden notes are not always English, while the cross-lingual model is trained for biomedical entity linking in multiple languages. This adds roughly 1.1 GB of weights and is therefore an accuracy-over-image-size choice. Revisit language routing on labelled multilingual consultation notes.
-
-## 2026-11-05 15:21 UTC — Bake semantic assets and retain lexical fallback
-
-Commit: `Add hybrid SapBERT retrieval`.
-
-Decision: download immutable model revisions and precompute normalized embeddings for all supplied titles during Docker build; run fully offline and fall back by batch to focused BM25. Alternatives: download at runtime, call an embedding API, commit binary weights, or remove fallback. Evidence: build-time title encoding took 254 seconds for English and 411 seconds for multilingual on the managed 5-CPU host. The resulting image was 2.87 GB. Runtime processed 60 notes in 16.3 seconds and 600 repeated texts with unique IDs in 61.2 seconds inside the runner, with no missing or invalid output, under the grading limit of 60 minutes and 16 GB. No API calls or keys are used. Revisit ONNX/int8 export if image transfer or cold-start time becomes material.
-
-## 2026-11-06 10:40 UTC — Keep Qwen as the measured local reranker
-
-Commit: `Restore Qwen prototype and bound llama-server RAM`.
-
-Decision: restore the exact Qwen3 4B Ollama prompt and settings used in the local measured run. Alternative: MedGemma 1.5 4B with constrained catalogue selection. Evidence supplied from the laptop: Qwen reached 38/60 top-one, 49/60 top-three, 52.08/75 in 38.2 seconds; MedGemma reached 31/60, 52/60, 47.50/75 in 136.2 seconds. These are development-set GPU experiments, not Docker grading results. Revisit model choice only after independent notes or a compliant CPU/API runtime is tested.
-
-## 2026-11-06 10:40 UTC — Bound llama-server prompt-cache RAM
-
-Commit: `Restore Qwen prototype and bound llama-server RAM`.
-
-Decision: launch llama.cpp build b12144 with `--cache-ram 0`, `--no-cache-idle-slots`, one slot, a 4,096-token context, and bounded batch sizes; disable per-request prompt caching in the llama-server client. Alternative: leave the server's 8,192 MiB default RAM prompt cache enabled or restart the process periodically. Evidence: `llama-server --help` documents that default; with caching disabled, ten distinct roughly 440-token prompts held resident memory at 4,715 MiB after each request on the cloud CPU host. This is a limited memory probe and does not prove laptop behavior over 60 notes. Revisit if the user's laptop still shows growth with the same flags.
-
-## 2026-11-06 16:30 UTC — Integrate fresh-note inference and a source layout
-
-Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
-
-Decision: place runtime code in `src/coder`, provider clients in `src/coder/providers`, configuration in `config`, and keep frozen experiments under `experiments/ollama`. Generate candidates from fresh notes, preserving the measured English mixture, candidate fusion and Qwen prompt. Alternatives: ship only frozen experiment files, replace English with hard routing (26/42), or adopt hierarchy/two-pass without a winning result. Evidence: English mixture is 27/44, Qwen 38/49; hierarchy 38/43 is worse. The new prompt regression is byte-identical. Revisit only with independent comparative evaluation.
-
-## 2026-11-06 16:30 UTC — Add a narrow multilingual extraction route
-
-Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
-
-Decision: retain pinned SapBERT encoders, add generic Spanish/Chinese section/speaker/assertion cues and note-local Schwartz–Hearst abbreviation expansion. Route non-English to multilingual SapBERT and exclude zero-score BM25 votes. Alternatives: translating every note with a second LLM, raising the embedding context alone, or disease-name aliases. Evidence from earlier local tests: context 384 alone did not improve the translated counts; structural extraction improved Spanish 0/0 to 2/3 and Chinese 0/0 to 0/2 on six paired cases each, with pool recall improving to 5/6 and 4/6. These visible cases informed development and are not independent validation. English extraction stayed unchanged across all 60 notes. Revisit on clinician-reviewed held-out multilingual notes.
-
-## 2026-11-06 16:30 UTC — API first, Qwen second, retrieval last
-
-Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
-
-Decision requested by user: use Anthropic Haiku 5.5 for expensive reranking, local Qwen when configured as fallback, and offline retrieval if neither succeeds. Alternatives: mandatory local GPU or pretending Qwen's score applies to another provider. Evidence: grader has no GPU, allows Anthropic/OpenAI APIs and demands no-key coverage. Verified `claude-haiku-5-5` in the official SDK. The actual SDK test caught removed `temperature` support; use its supported interface and forced ranking tool. No live key is available here, so no live API accuracy is claimed. Revisit after a real API smoke test and dev evaluation.
-
-## 2026-11-06 16:30 UTC — Bound API time/spend and preserve coverage
-
-Commit: `Integrate API-first coding pipeline and preserve Qwen retrieval`.
-
-Decision: no SDK retries, conservative $5.50 reservation with UTF-8 byte/token overestimate and full output cap, keep reservation even on errors, disable each provider after three consecutive failures, and leave 300 seconds for fallbacks. Alternatives: retry until success or stop on each malformed response. Evidence: brief caps all 600 notes at $6/60 minutes and missing notes score zero. SDK MockTransport tests verify 429 makes one request, over-budget calls make none, and API/local failures still emit every ID. Secondary pricing source is cited; official pricing page could not be reached through policy. Revisit against live latency, usage and current provider pricing before submitting.
-
-## 2026-11-06 16:46 UTC — Freeze measured integration checks and disclose API gap
-
-Commit: `Record final CPU and provider integration validation`.
-
-Decision: keep the implementation unchanged after the clean-clone run, record the reproducible results, and require a later live Haiku check rather than relabel Qwen's score as API performance. Evidence: 35/35 checks passed including actual SDK/real encoders with simulated API HTTP, all 60 candidate pools/fallbacks equal frozen Qwen inputs, official offline score 27/44 (40.83/75), 600 offline notes in 65.03 seconds at 1,719 MiB on four CPUs/6 GB with no missing/invalid output. Three real CPU Qwen requests succeeded with stable 5,292 MiB-class RSS (exact KiB values retained in report). Initial cloud VFS disk exhaustion was resolved by removing only task-created obsolete cache layers and a completed temporary model download; the clean build then passed. Alternative: skip clean-clone/runtime checks or claim unmeasured API quality. Revisit Haiku accuracy, latency and current token pricing when credentials/allowed egress are available. The user explicitly deferred bundle/email; do not create/send them. Main push remains subject to final approval.
-
-## 2026-11-06 16:48 UTC — Preserve parallel main history during integration
-
-Commit: `Merge main history into tested final integration`.
-
-Decision: join the existing main preparation commit as a second parent while retaining the tested integration tree. Evidence: main `a1a85ea` and SapBERT/Qwen share `6f5ce6d` but are parallel descendants; main's patient/negation guards, RRF, dense retrieval builder and tests are already included or superseded in the tested code. Only this decision-log entry changes in the merge. This allows a normal fast-forward update after approval and preserves both histories. Revisit only if remote main changes before the approved push. No remote write has occurred.
-
-## 2026-11-06 17:23 UTC — Extend free API validation through actual sockets
-
-Commit: `Harden optional services and verify complete Docker smoke`. Decision: use a stdlib loopback fake API and a non-forwarding CONNECT/TLS proxy with the real SDK, rather than add the linked Node fake whose endpoint only returns text. Evidence: seven tests passed, including exactly three clinical notes with real retrieval and two API rankings/one fallback; error, timeout, malformed-response and certificate/proxy paths exercised without paid calls. The initially started 600-note check was stopped and removed when the user rejected that scope. The pinned SDK sends Bearer authentication; corrected the test's older-header assumption. Production code is unchanged. Add an explicit one-request live smoke command that cannot pass via fallback; do not run it with credentials without authorization. Revisit server-side compatibility and account/model access when a key is available.
-
-## 2026-11-06 17:39 UTC — Complete three-case reliability and Docker smoke
-
-Commit: `Harden optional services and verify complete Docker smoke`. Decision: test the full CLI with its actual SDK, official base URL, real encoders and a non-forwarding HTTPS CONNECT proxy, then rebuild and verify the final image/Compose setup. Reuse only three clinical inputs across scenarios. Evidence: 51 tests passed in 60.757s; four CLI methods passed again in the rebuilt image; exact Compose invocation emitted all three valid predictions in 7.1874s at 1,475.9 MiB; pip check, fake-key/model/proxy forwarding, CPU settings, asset/source integrity and no-key helper checks passed. Fault injection exposed startup/cleanup exceptions and partial batch handling that could fail or lose predictions; fixed those boundaries and redacted key diagnostics. Ranking, prompt and models unchanged. No new runtime dependencies, paid calls, live account access, large dataset run, commit, push, bundle or email. Revisit real account/model access only when credentials become available.
-
-## 2026-11-06 18:09 UTC — Optional host Ollama access from Docker
-
-Commit: `Add optional host networking override for local Qwen`.
-
-Decision requested by user: commit `compose.qwen.yaml` on the final branch. The override changes only network_mode to host; provider/model/key settings remain in the base Compose file and .env. Alternatives: alter the default grading network or permit non-loopback Qwen endpoints. Evidence: the current local client deliberately accepts loopback only; merged Compose configuration is checked for host networking and preserved environment/model settings. No model inference or live host Ollama connectivity is claimed in this configuration-only check. Revisit bridge networking only if needed on another Docker platform.
-
-## 2026-11-07T02:37+00:00 — Local cleanup draft
-
-Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.
+Commit: `11dcc83`. Keep only the public catalogue tracked; remove clinical inputs, derivatives and note-level reports from prepared history. Mount private input externally. Remove frozen/duplicate launchers, retain branch-specific Docker runners, and archive the temporary download branch. Seven distinct builds and three-note smokes passed; publication still needs approval.
