@@ -1,15 +1,18 @@
 # Running the final prototype
 
-Run commands from the repository root. Use the Anthropic path first. Ollama is
+Run commands from the repository root in Bash. Use the Anthropic path first. Ollama is
 optional; no separate llama-server installation or launch is needed.
 
 Keep input notes and gold labels in `private-data/`, and predictions in `out/`.
 Neither directory should be committed. The examples below assume your input is
 `private-data/notes.jsonl`. Replace that filename with your own.
+Input is JSONL: one object per line with a string `id` and the consultation note
+in a string `text` field. IDs must be unique within the file.
 
 ## 1. Anthropic API — Docker
 
-Copy the environment template:
+Install Docker with the Compose plugin. Copy the environment template once
+(keep your existing `.env` if already configured):
 
 ```bash
 cp .env.example .env
@@ -36,9 +39,10 @@ docker compose build coder
 docker compose run --rm coder /in/notes.jsonl /out/predictions.jsonl
 ```
 
-The build downloads the pinned English and multilingual query encoders. It
-reuses the bundled public catalogue embeddings, so it does not encode the
-catalogue again. No GPU is required for this path.
+The build prepares the English and multilingual encoders and catalogue index.
+Allow time and internet access for the initial model downloads and asset setup.
+The Drive download below does not bypass these Docker build steps. No GPU is
+required for this path.
 
 Automatic routing is Anthropic first, configured local Qwen second, retrieval
 last. With `QWEN_BACKEND` empty, API failures fall back to retrieval. A completed
@@ -98,6 +102,7 @@ The app container's memory limit does not constrain Ollama running on the host.
 
 ### Run through Ollama
 
+Build the app image using `docker compose build coder` if you skipped section 1.
 Set these fields in `.env`:
 
 ```dotenv
@@ -129,8 +134,20 @@ python -m pip install -r requirements.txt -r requirements-api.txt
 mkdir -p private-data out
 ```
 
-Prepare the query encoders once. These commands reuse the bundled catalogue
-matrices; encoder/tokenizer downloads are still needed:
+Download the prepared semantic assets from
+[Google Drive](https://drive.google.com/drive/folders/14W-Rx1LamEf1SWjIal2o-ODjqUqciBfQ?usp=sharing).
+Place the downloaded `semantic/` folder under `assets/`, so both
+`assets/semantic/english/` and `assets/semantic/multilingual/` contain `model/`,
+`metadata.json` and `title_embeddings.npy`. With the complete assets in place,
+run `python scripts/finalize_tokenizers.py`, then skip the encoder preparation
+commands below and proceed to running the app.
+The catalogue index stays the same for 60 or 600 notes; it is not rebuilt per
+input dataset. This download is for native setup; the Docker build still
+prepares its own encoders.
+
+Alternatively, prepare the query encoders and catalogue vectors once with the
+commands below. They download the pinned encoders and generate the title
+matrices, or reuse matching bundled matrices when supported by your checkout:
 
 ```bash
 python -m scripts.build_semantic_assets \
