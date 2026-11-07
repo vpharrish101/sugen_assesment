@@ -25,3 +25,7 @@ Decision: ship only the runner and supplied code catalogue in a digest-pinned Py
 Commit: `Implement title-only BM25 baseline`.
 
 Decision: record the raw-title baseline without tuning against dev gold. Alternatives: immediately add stopwords, favour leaf/residual categories, or adjust query sections to improve the score. Evidence: official scorer reports 5/60 top-1, 9/60 top-3, 7.9/75, zero missing/invalid/duplicate predictions; recall@25 is 26/60 and recall@50 is 31/60. Five unit/CLI tests passed. Full-note matching can rank hypothetical fever or background symptoms ahead of the encounter diagnosis, confirming a limitation rather than a runtime failure. The network-disabled Docker run matched the dev contract and processed 600 repeated-dev notes with new IDs in 2.24 seconds under 1 CPU/1 GB; this is a throughput check, not generalisation evidence. Revisit search coverage and clinical interpretation as separate measured changes.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.

@@ -1,31 +1,19 @@
-# ICD-11 title-only baseline
+# Full-note BM25 baseline
 
-CPU-only BM25 retrieval over all **18,375 supplied category titles**. Uses Python's standard library; no model, API key, external data, or runtime network. This is the control for later clinical extraction, semantic retrieval, and family expansion, not the final assessment submission.
-
-```sh
-docker compose build
-docker compose run coder /in/notes.jsonl /out/predictions.jsonl
-python score.py --gold data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
-```
-
-The included `data/notes.jsonl` is the dev input with **only id/text**. Default mounts are `./data:/in:ro` and `./out:/out`. For another input, set `CODER_INPUT_DIR` to a directory containing `notes.jsonl`; set `CODER_OUTPUT_DIR` to an existing writable directory if desired. Defaults are 1 CPU/1 GB, configurable via `CODER_CPUS`/`CODER_MEMORY`. Output has one flushed JSONL record per unique input ID. Duplicate input IDs or malformed records fail with a line-numbered error. Successful summaries go to stderr, not the predictions file.
-
-Local execution and verification (Python 3.12):
+This branch preserves the corresponding prototype. See `final-prototype` or
+`main` for the final API-first application. Public catalogue only: supply your
+own notes/labels in ignored `private-data/` (or CODER_INPUT_DIR), never in Git.
 
 ```sh
-python -m coder data/notes.jsonl out/predictions.jsonl
-python -m coder.evaluate --gold data/dev_notes.jsonl
-python -m unittest discover -s tests -v
+mkdir -p private-data out
+docker compose build coder
+docker compose run --rm coder /in/notes.jsonl /out/predictions.jsonl
+python score.py --gold private-data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
 ```
 
-**Measured dev result:** top-1 **5/60 (8.33%)**, top-3 **9/60 (15%)**, official score **7.9/75**. Candidate recall@25 **26/60 (43.33%)**, recall@50 **31/60 (51.67%)**. The dev set has no B slice; its maximum is 75. No missing, invalid, or duplicate predictions. Hidden-score estimate is deferred: this baseline has not established cross-distribution clinical accuracy and is not submission-ready.
 
-**Method:** Unicode case folding/tokenization; BM25 k1=1.5, b=0.75; each query term counts once. Equal scores use code order. Zero-overlap notes receive deterministic valid codes with zero relevance, reported in stderr. These are coverage fallbacks, not reliable diagnoses. Full notes include history, negation, and hypothetical advice that plain lexical matching cannot interpret; the baseline deliberately adds no diagnosis-specific rules.
-
-**Data/provenance:** original assessment files are preserved, including unmodified `score.py`; `data/notes.jsonl` is derived from the supplied dev input. No external medical data added. Dev gold/scorer are excluded from the image; only catalogue and runner are copied. The Python base image is digest-pinned.
-
-**Beyond dev:** five unit/CLI tests cover unseen/Unicode IDs, empty and unmatched notes, ignored gold fields, duplicate rejection, and input preservation. With Docker networking disabled and a 1 CPU/1 GB limit, 600 repeated-dev notes with new IDs took **2.24 seconds** inside the runner. This checks throughput only, not generalisation. Metrics and source hashes are in `reports/baseline.json`; clean-clone verification is recorded in `DECISIONS.md` when completed.
-
-**AI error caught:** preliminary AI research mapped chickenpox to `1F51.Z`; the supplied catalogue identifies that as African trypanosomiasis. Uncomplicated varicella is `1E90.0`. Outputs are therefore always checked against the catalogue; this still does not guarantee clinical correctness.
-
-Hours spent: final accounting pending; this is an intermediate baseline. See `DECISIONS.md` for implementation decisions and evidence.
+Tests use small protocol fixtures; clinical input for a smoke test is mounted
+privately and limited externally to three notes. Runtime output stays in ignored
+out/. Models/indexes are built from public catalogue titles, not consultation
+notes. No training, API credentials or private notes are embedded in the image.
+Original aggregate benchmark results are recorded in the final branch README.
