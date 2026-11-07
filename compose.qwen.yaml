@@ -1,0 +1,3 @@
+services:
+  coder:
+    network_mode: host

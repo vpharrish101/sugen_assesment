@@ -85,3 +85,7 @@ Decision: restore the exact Qwen3 4B Ollama prompt and settings used in the loca
 Commit: `Restore Qwen prototype and bound llama-server RAM`.
 
 Decision: launch llama.cpp build b12144 with `--cache-ram 0`, `--no-cache-idle-slots`, one slot, a 4,096-token context, and bounded batch sizes; disable per-request prompt caching in the llama-server client. Alternative: leave the server's 8,192 MiB default RAM prompt cache enabled or restart the process periodically. Evidence: `llama-server --help` documents that default; with caching disabled, ten distinct roughly 440-token prompts held resident memory at 4,715 MiB after each request on the cloud CPU host. This is a limited memory probe and does not prove laptop behavior over 60 notes. Revisit if the user's laptop still shows growth with the same flags.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.
