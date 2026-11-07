@@ -42,8 +42,3 @@ Following sufficient research and analysis on the task, I landed on 4 architectu
 
 <img width="845" height="873" alt="image" src="https://github.com/user-attachments/assets/046f534f-1131-4bac-b910-7664e7dd15f2" />
 
-### 2. Workflow decisions, and other points
-
-**a.** Testing was done between Qwen3 and MedGamma, since the latter is explicitly trained on medical corpus.
-
-**a1.** However, the results were contradictory, and my initial reasoning is that Qwen is excellent as short range classification tasks, unlike MedGemma.
