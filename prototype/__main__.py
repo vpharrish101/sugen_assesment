@@ -68,7 +68,7 @@ def run(source,output,mms=DEFAULT_MMS,assets=DEFAULT_SEMANTIC_ASSETS,model=MODEL
                             calls+=1;codes=parse_basic(infer(client,endpoint,basic_payload(row,model)),row)
                         failures=0
                     except Exception as exc:error=str(exc);failures+=1;fallbacks+=1
-                    if ARCHITECTURE=='two-pass' and failures==0:
+                    if ARCHITECTURE=='two-pass' and failures<3 and time.monotonic()-started<3300:
                         from .two_pass_reranker import shortlist,verifier_payload
                         first=codes
                         try:
