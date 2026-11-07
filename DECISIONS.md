@@ -73,3 +73,7 @@ Decision: ship pinned multilingual SapBERT-XLMR revision `47b6bd0…`, route wit
 Commit: `Add hybrid SapBERT retrieval`.
 
 Decision: download immutable model revisions and precompute normalized embeddings for all supplied titles during Docker build; run fully offline and fall back by batch to focused BM25. Alternatives: download at runtime, call an embedding API, commit binary weights, or remove fallback. Evidence: build-time title encoding took 254 seconds for English and 411 seconds for multilingual on the managed 5-CPU host. The resulting image was 2.87 GB. Runtime processed 60 notes in 16.3 seconds and 600 repeated texts with unique IDs in 61.2 seconds inside the runner, with no missing or invalid output, under the grading limit of 60 minutes and 16 GB. No API calls or keys are used. Revisit ONNX/int8 export if image transfer or cold-start time becomes material.
+
+## 2026-11-07T02:37+00:00 — Local cleanup draft
+
+Remove supplied/private clinical files and derived reports from history, keep the public catalogue, mount input privately and retain only branch-relevant runtime/build/test code. Main will match the cleaned final tree. No remote publication until explicit approval. Smoke checks use at most three external notes and local fake inference; historical scores are not rerun.
