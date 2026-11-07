@@ -5,6 +5,7 @@ This branch preserves the corresponding prototype. See `final-prototype` or
 own notes/labels in ignored `private-data/` (or CODER_INPUT_DIR), never in Git.
 
 ```sh
+mkdir -p private-data out
 docker compose build coder
 docker compose run --rm coder /in/notes.jsonl /out/predictions.jsonl
 python score.py --gold private-data/dev_notes.jsonl --pred out/predictions.jsonl --mms data/mms-2026-01.json
