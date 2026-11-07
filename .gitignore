@@ -1,6 +1,7 @@
-__pycache__/
-*.py[cod]
-out/*
-!out/.gitkeep
+*.jsonl
 .env
+.env.*
+private-data/
+out/
+reports/
 *.bundle
